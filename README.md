@@ -1,1 +1,3 @@
-# pdf-extractor-ui
+# PDF Extractor UI
+
+A high-performance PDF Batch Processing & Text Extraction Engine designed for scalable data ingestion and real-time document analysis. This application enables bulk directory processing with a modular extraction pipeline, allowing users to dynamically toggle the removal of headers, footers, page numbers, and numerical data, or apply lemmatization on the fly. Built with an event-driven architecture, it features a comprehensive real-time dashboard that tracks processing velocity, elapsed time, and granular file-level progress with native Pause/Resume functionality. Post-extraction, the system provides an integrated full-text search interface to query the processed dataset instantly.
