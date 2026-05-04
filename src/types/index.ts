@@ -1,5 +1,7 @@
 export type FileStatus = 'queued' | 'processing' | 'completed' | 'failed';
 
+export type ExtractMethod = 'direct' | 'ocr' | 'error' | 'undefined';
+
 export interface PDFFile {
   id: string;
   name: string;
@@ -7,6 +9,7 @@ export interface PDFFile {
   status: FileStatus;
   progress: number;
   addedAt: Date;
+  method: ExtractMethod;
   extractedText?: string;
 }
 
@@ -34,3 +37,15 @@ export interface SearchResult {
 }
 
 export type NavView = 'dashboard' | 'files' | 'search' | 'settings';
+
+  // const updateFileStatus = (fileNameFromBackend, newStatus, newMethod) => {
+export interface FileStatusUpdate {
+  fileNameFromBackend: string;
+  newStatus: string;
+  newMethod: ExtractMethod;
+  progress?: number;
+}
+
+export interface AbortController {
+  abort: () => void;
+}
