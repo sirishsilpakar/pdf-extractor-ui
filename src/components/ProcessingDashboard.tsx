@@ -66,7 +66,7 @@ export function ProcessingDashboard({
         <div className="flex items-center gap-2">
           <Zap className="h-4 w-4 text-accent" />
           <h2 className="font-semibold text-sm">
-            Processing Dashboard | Processing: {isProcessing ? "true" : "false"} | Total Files: {totalFiles}
+            Processing Dashboard
           </h2>
         </div>
         <div className="flex items-center gap-1.5">

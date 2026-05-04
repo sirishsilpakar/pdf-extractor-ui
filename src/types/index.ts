@@ -4,6 +4,7 @@ export type ExtractMethod = 'direct' | 'ocr' | 'error' | 'undefined';
 
 export interface PDFFile {
   id: string;
+  batchId: string;
   name: string;
   size: number;
   status: FileStatus;
@@ -19,7 +20,6 @@ export interface ProcessingSettings {
   removePageNumbers: boolean;
   removeNumericValues: boolean;
   enableLemmatization: boolean;
-  applyToAll: boolean;
 }
 
 export interface LogEntry {
@@ -36,7 +36,7 @@ export interface SearchResult {
   matchIndex: number;
 }
 
-export type NavView = 'dashboard' | 'files' | 'search' | 'settings';
+export type NavView = 'dashboard' | 'files' | 'activity' | 'search' | 'settings';
 
   // const updateFileStatus = (fileNameFromBackend, newStatus, newMethod) => {
 export interface FileStatusUpdate {

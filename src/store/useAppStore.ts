@@ -60,10 +60,9 @@ const MOCK_LOGS: LogEntry[] = [];
 const defaultSettings: ProcessingSettings = {
   removeHeader: true,
   removeFooter: true,
-  removePageNumbers: false,
-  removeNumericValues: false,
+  removePageNumbers: true,
+  removeNumericValues: true,
   enableLemmatization: false,
-  applyToAll: true,
 };
 
 export function useAppStore() {
@@ -85,7 +84,7 @@ export function useAppStore() {
   const [inputDir, setInputDir] = useState<string>("");
   const abortControllerRef = useRef<AbortController | null>(null);
   const [eventErr, setEventErr] = useState<boolean>(false);
-  console.log("This runs on every reload?");
+  const [applyAll, setApplyAll] = useState<boolean>(false);
   // const totalFiles = files.length;
   // const completedFiles = files.filter((f) => f.status === "completed").length;
   const failedFiles = files.filter((f) => f.status === "failed").length;
@@ -94,11 +93,13 @@ export function useAppStore() {
   //   totalFiles > 0 ? Math.round((completedFiles / totalFiles) * 100) : 0;
 
   useEffect(() => {
+    getFiles();
     const savedJobId = localStorage.getItem("job_id");
     if (!savedJobId) return;
 
     checkAndReattach(savedJobId);
   }, []);
+
   const addLog = useCallback(
     (message: string, type: LogEntry["type"] = "info") => {
       setLogs((prev) => [
@@ -135,21 +136,49 @@ export function useAppStore() {
     [addLog],
   );
 
-  const addFiles = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const getFiles = async () => {
+    try {
+      const response = await fetch("http://localhost:8000/files", {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!response.ok) {
+        return;
+      }
+      const files = await response.json();
+
+      setFiles(
+        files.map((f) => ({
+          id: f.id,
+          batchId: f.batch_id,
+          name: f.file_name,
+          size: f.size,
+          status: f.status,
+          progress: 100,
+          addedAt: f.addedAt,
+          method: f.method,
+        })),
+      );
+    } catch (e) {
+      console.error("Failed to load file list:", e);
+    }
+  };
+
+  const addFiles = (filesArray) => {
     // setting error false here
     // set true when event fails
     // this stops the elappsed timer
     setEventErr(false);
-    const files = Array.from(event.target.files);
-    const filePath = files[0].webkitRelativePath.split("/")[0];
+    const filePath = filesArray[0].webkitRelativePath.split("/")[0];
     setInputDir(filePath);
-    const pdfFiles = files.filter((file) =>
+    const pdfFiles = filesArray.filter((file) =>
       file.name.toLowerCase().endsWith(".pdf"),
     );
     const newFiles: PDFFile[] = pdfFiles.map((file) => ({
       id: String(Date.now() + Math.random()),
+      batchId: "",
       name: file.name,
-      size: Math.floor(Math.random() * 5000000) + 100000,
+      size: file.size,
       status: "queued" as const,
       progress: 0,
       method: "undefined",
@@ -158,6 +187,20 @@ export function useAppStore() {
     setFiles((prev) => [...prev, ...newFiles]);
     setTotalFiles(pdfFiles.length);
     addLog(`Added ${pdfFiles.length} file(s) to queue`, "info");
+  };
+
+  const dropFiles = (event: React.DragEvent<Element>) => {
+    if (event.dataTransfer.files && event.dataTransfer.files.length > 0) {
+      const droppedFiles = Array.from(event.dataTransfer.files);
+      addFiles(droppedFiles);
+      // Clear the data transfer for the next drop
+      event.dataTransfer.clearData();
+    }
+  };
+
+  const importFiles = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files);
+    addFiles(files);
   };
 
   const pauseProcessing = useCallback(() => {
@@ -177,7 +220,6 @@ export function useAppStore() {
   }, [addLog]);
 
   const checkAndReattach = async (jobId: string) => {
-    console.log("Hello yo call vako ho?");
     const res = await fetch(`http://localhost:8000/extract/status/${jobId}`);
     if (!res.ok) {
       localStorage.removeItem("job_id"); // stale job_id, clean up
@@ -324,24 +366,55 @@ export function useAppStore() {
       force: false,
       no_ocr: false,
       fast: false,
-      removeHeader: false,
-      removeFooter: false,
-      removePageNumber: false,
-      removeNumerics: false,
-      lemma: false,
+      removeHeader: settings.removeHeader,
+      removeFooter: settings.removeFooter,
+      removePageNumber: settings.removePageNumbers,
+      removeNumerics: settings.removeNumericValues,
+      lemma: settings.enableLemmatization,
     });
     setIsProcessing(false);
+  }, [inputDir, settings]);
 
-    // const firstQueued = files.find((f) => f.status === "queued");
-    // if (firstQueued) {
-    //   setFiles((prev) =>
-    //     prev.map((f) =>
-    //       f.id === firstQueued.id ? { ...f, status: "processing" as const } : f,
-    //     ),
-    //   );
-    //   addLog(`Processing started for ${firstQueued.name}`, "info");
-    // }
-  }, [inputDir]);
+  const saveLog = async (payload) => {
+     try {
+      const response = await fetch("http://localhost:8000/logs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({logs: payload}),
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.detail || "Failed to save log");
+      }
+      getLogs();
+    } catch (e) {
+      console.error("Extraction failed:", e);
+    }
+  }
+
+  const getLogs = async () => {
+     try {
+      const response = await fetch("http://localhost:8000/logs", {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!response.ok) {
+        return;
+      }
+      const files = await response.json();
+      setLogs(
+        files.map((f) => ({
+          id: f.id,
+          timestamp: f.timestamp,
+          message: f.message,
+          type: f.type,
+        })),
+      );
+    } catch (e) {
+      console.error("Failed to load log list:", e);
+    }
+  }
 
   const searchResults: SearchResult[] = searchQuery
     ? files
@@ -365,6 +438,13 @@ export function useAppStore() {
           };
         })
     : [];
+
+  const updateAllSetting = useCallback((value) => {
+    setApplyAll(value);
+    Object.keys(defaultSettings).forEach((key) => {
+      setSettings((prev) => ({ ...prev, [key]: value }));
+    });
+  }, []);
 
   const updateSetting = useCallback(
     <K extends keyof ProcessingSettings>(
@@ -394,10 +474,13 @@ export function useAppStore() {
     overallProgress,
     searchResults,
     eventErr,
+    applyAll,
+    saveLog,
+    dropFiles,
     setCurrentView,
     removeFile,
     retryFile,
-    addFiles,
+    importFiles,
     pauseProcessing,
     resumeProcessing,
     cancelProcessing,
@@ -405,6 +488,7 @@ export function useAppStore() {
     setSearchQuery,
     setGlobalSearch,
     setLogsAutoscroll,
+    updateAllSetting,
     updateSetting,
   };
 }
