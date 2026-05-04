@@ -5,105 +5,57 @@ import type {
   LogEntry,
   SearchResult,
   NavView,
+  AbortController,
 } from "@/types";
 
 const MOCK_FILES: PDFFile[] = [
-  {
-    id: "1",
-    name: "annual-report-2025.pdf",
-    size: 4523000,
-    status: "completed",
-    progress: 100,
-    addedAt: new Date(),
-    extractedText:
-      "The annual report covers financial performance, market analysis, and strategic initiatives for the fiscal year 2025. Revenue growth exceeded expectations at 23% year-over-year.",
-  },
-  {
-    id: "2",
-    name: "research-paper.pdf",
-    size: 1230000,
-    status: "processing",
-    progress: 67,
-    addedAt: new Date(),
-    extractedText:
-      "Machine learning approaches to natural language processing have evolved significantly.",
-  },
-  {
-    id: "3",
-    name: "invoice-batch-q4.pdf",
-    size: 890000,
-    status: "queued",
-    progress: 0,
-    addedAt: new Date(),
-  },
-  {
-    id: "4",
-    name: "contract-draft-v3.pdf",
-    size: 2100000,
-    status: "failed",
-    progress: 34,
-    addedAt: new Date(),
-  },
-  {
-    id: "5",
-    name: "meeting-notes-dec.pdf",
-    size: 340000,
-    status: "queued",
-    progress: 0,
-    addedAt: new Date(),
-  },
+  // {
+  //   id: "1",
+  //   name: "annual-report-2025.pdf",
+  //   size: 4523000,
+  //   status: "queued",
+  //   method: "direct",
+  //   progress: 100,
+  //   addedAt: new Date(),
+  //   extractedText:
+  //     "The annual report covers financial performance, market analysis, and strategic initiatives for the fiscal year 2025. Revenue growth exceeded expectations at 23% year-over-year.",
+  // },
+  // {
+  //   id: "2",
+  //   name: "annual-report-2025.pdf",
+  //   size: 4523000,
+  //   status: "processing",
+  //   method: "direct",
+  //   progress: 100,
+  //   addedAt: new Date(),
+  //   extractedText:
+  //     "The annual report covers financial performance, market analysis, and strategic initiatives for the fiscal year 2025. Revenue growth exceeded expectations at 23% year-over-year.",
+  // },
+  // {
+  //   id: "3",
+  //   name: "annual-report-2025.pdf",
+  //   size: 4523000,
+  //   status: "completed",
+  //   method: "direct",
+  //   progress: 100,
+  //   addedAt: new Date(),
+  //   extractedText:
+  //     "The annual report covers financial performance, market analysis, and strategic initiatives for the fiscal year 2025. Revenue growth exceeded expectations at 23% year-over-year.",
+  // },
+  // {
+  //   id: "4",
+  //   name: "annual-report-2025.pdf",
+  //   size: 4523000,
+  //   status: "failed",
+  //   method: "ocr",
+  //   progress: 100,
+  //   addedAt: new Date(),
+  //   extractedText:
+  //     "The annual report covers financial performance, market analysis, and strategic initiatives for the fiscal year 2025. Revenue growth exceeded expectations at 23% year-over-year.",
+  // },
 ];
 
-const MOCK_LOGS: LogEntry[] = [
-  {
-    id: "1",
-    timestamp: new Date(Date.now() - 30000),
-    message: "Processing started for annual-report-2025.pdf",
-    type: "info",
-  },
-  {
-    id: "2",
-    timestamp: new Date(Date.now() - 25000),
-    message: "Extracting page 1 of 24...",
-    type: "info",
-  },
-  {
-    id: "3",
-    timestamp: new Date(Date.now() - 20000),
-    message: "Removing headers detected on pages 1-24",
-    type: "info",
-  },
-  {
-    id: "4",
-    timestamp: new Date(Date.now() - 15000),
-    message: "Text extraction complete for annual-report-2025.pdf",
-    type: "success",
-  },
-  {
-    id: "5",
-    timestamp: new Date(Date.now() - 10000),
-    message: "Processing started for research-paper.pdf",
-    type: "info",
-  },
-  {
-    id: "6",
-    timestamp: new Date(Date.now() - 8000),
-    message: "Extracting page 5 of 12...",
-    type: "info",
-  },
-  {
-    id: "7",
-    timestamp: new Date(Date.now() - 5000),
-    message: "Warning: Low contrast text detected on page 7",
-    type: "warning",
-  },
-  {
-    id: "8",
-    timestamp: new Date(Date.now() - 2000),
-    message: "Failed to process contract-draft-v3.pdf: corrupted file",
-    type: "error",
-  },
-];
+const MOCK_LOGS: LogEntry[] = [];
 
 const defaultSettings: ProcessingSettings = {
   removeHeader: true,
@@ -129,8 +81,11 @@ export function useAppStore() {
   const [overallProgress, setOverallProgress] = useState<number>(0);
   const [totalFiles, setTotalFiles] = useState<number>(0);
   const [completedFiles, setCompletedFiles] = useState<number>(0);
-  const [processingFile, setProcessingFile] = useState<string>("No file");
-
+  const [processingFile, setProcessingFile] = useState<string>("");
+  const [inputDir, setInputDir] = useState<string>("");
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const [eventErr, setEventErr] = useState<boolean>(false);
+  console.log("This runs on every reload?");
   // const totalFiles = files.length;
   // const completedFiles = files.filter((f) => f.status === "completed").length;
   const failedFiles = files.filter((f) => f.status === "failed").length;
@@ -138,6 +93,12 @@ export function useAppStore() {
   // const overallProgress =
   //   totalFiles > 0 ? Math.round((completedFiles / totalFiles) * 100) : 0;
 
+  useEffect(() => {
+    const savedJobId = localStorage.getItem("job_id");
+    if (!savedJobId) return;
+
+    checkAndReattach(savedJobId);
+  }, []);
   const addLog = useCallback(
     (message: string, type: LogEntry["type"] = "info") => {
       setLogs((prev) => [
@@ -152,71 +113,6 @@ export function useAppStore() {
     },
     [],
   );
-
-  // Simulated processing
-  useEffect(() => {
-    if (!isProcessing || isPaused) {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      return;
-    }
-    intervalRef.current = setInterval(() => {
-      setFiles((prev) => {
-        const processing = prev.find((f) => f.status === "processing");
-        if (processing) {
-          const newProgress = Math.min(
-            processing.progress + Math.random() * 8,
-            100,
-          );
-          if (newProgress >= 100) {
-            addLog(
-              `Text extraction complete for ${processing.name}`,
-              "success",
-            );
-            const nextQueued = prev.find((f) => f.status === "queued");
-            if (nextQueued) {
-              addLog(`Processing started for ${nextQueued.name}`, "info");
-            }
-            return prev.map((f) => {
-              if (f.id === processing.id)
-                return { ...f, status: "completed" as const, progress: 100 };
-              if (f.id === nextQueued?.id)
-                return { ...f, status: "processing" as const, progress: 2 };
-              return f;
-            });
-          }
-          if (Math.random() > 0.7) {
-            addLog(
-              `Extracting page ${Math.floor(newProgress / 10)} of ${processing.name}...`,
-              "info",
-            );
-          }
-          return prev.map((f) =>
-            f.id === processing.id
-              ? { ...f, progress: Math.round(newProgress) }
-              : f,
-          );
-        }
-        return prev;
-      });
-    }, 1200);
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, [isProcessing, isPaused, addLog]);
-
-  const toggleFileSelection = useCallback((id: string) => {
-    setSelectedFiles((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  }, []);
-
-  const selectAllFiles = useCallback(() => {
-    setSelectedFiles((prev) =>
-      prev.size === files.length ? new Set() : new Set(files.map((f) => f.id)),
-    );
-  }, [files]);
 
   const removeFile = useCallback((id: string) => {
     setFiles((prev) => prev.filter((f) => f.id !== id));
@@ -239,48 +135,189 @@ export function useAppStore() {
     [addLog],
   );
 
-  const addFiles = useCallback(
-    (names: string[]) => {
-      const newFiles: PDFFile[] = names.map((name) => ({
-        id: String(Date.now() + Math.random()),
-        name,
-        size: Math.floor(Math.random() * 5000000) + 100000,
-        status: "queued" as const,
-        progress: 0,
-        addedAt: new Date(),
-      }));
-      setFiles((prev) => [...prev, ...newFiles]);
-      addLog(`Added ${names.length} file(s) to queue`, "info");
-    },
-    [addLog],
-  );
+  const addFiles = (event: React.ChangeEvent<HTMLInputElement>) => {
+    // setting error false here
+    // set true when event fails
+    // this stops the elappsed timer
+    setEventErr(false);
+    const files = Array.from(event.target.files);
+    const filePath = files[0].webkitRelativePath.split("/")[0];
+    setInputDir(filePath);
+    const pdfFiles = files.filter((file) =>
+      file.name.toLowerCase().endsWith(".pdf"),
+    );
+    const newFiles: PDFFile[] = pdfFiles.map((file) => ({
+      id: String(Date.now() + Math.random()),
+      name: file.name,
+      size: Math.floor(Math.random() * 5000000) + 100000,
+      status: "queued" as const,
+      progress: 0,
+      method: "undefined",
+      addedAt: new Date(),
+    }));
+    setFiles((prev) => [...prev, ...newFiles]);
+    setTotalFiles(pdfFiles.length);
+    addLog(`Added ${pdfFiles.length} file(s) to queue`, "info");
+  };
 
   const pauseProcessing = useCallback(() => {
     setIsPaused(true);
     addLog("Processing paused", "warning");
   }, [addLog]);
+
   const resumeProcessing = useCallback(() => {
     setIsPaused(false);
     addLog("Processing resumed", "info");
   }, [addLog]);
+
   const cancelProcessing = useCallback(() => {
     setIsProcessing(false);
     setIsPaused(false);
-    setFiles((prev) =>
-      prev.map((f) =>
-        f.status === "processing"
-          ? { ...f, status: "queued" as const, progress: 0 }
-          : f,
-      ),
-    );
     addLog("Processing cancelled", "error");
   }, [addLog]);
+
+  const checkAndReattach = async (jobId: string) => {
+    console.log("Hello yo call vako ho?");
+    const res = await fetch(`http://localhost:8000/extract/status/${jobId}`);
+    if (!res.ok) {
+      localStorage.removeItem("job_id"); // stale job_id, clean up
+      return;
+    }
+
+    const job = await res.json();
+
+    if (job.status === "running" || job.status === "queued") {
+      // Reattach — buffer replay handles missed events
+      streamExtraction(jobId);
+    } else if (job.status === "completed") {
+      // Restore completed UI state
+      // setOverallProgress(100)
+    } else if (job.status === "failed") {
+      // Show error state
+      console.error("Job failed:", job.error);
+    }
+  };
+
+  const startExtraction = async (payload) => {
+    try {
+      const response = await fetch("http://localhost:8000/extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        addLog(`${err.detail || "Failed to submit job"}`, "error");
+        throw new Error(err.detail || "Failed to submit job");
+      }
+
+      const { job_id, queue_position } = await response.json();
+      localStorage.setItem("job_id", job_id);
+
+      if (queue_position > 1) {
+        addLog(`Queued at position ${queue_position}`, "info");
+      }
+
+      streamExtraction(job_id);
+    } catch (e) {
+      console.error("Extraction failed:", e);
+    }
+  };
+
+  const streamExtraction = (jobId: string) => {
+    // Abort any existing stream before starting a new one
+    abortControllerRef.current?.abort();
+
+    const es = new EventSource(`http://localhost:8000/extract/stream/${jobId}`);
+
+    es.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+
+      if (data.status === "completed") {
+        addLog("Text extraction is completed", "success");
+        es.close();
+      } else if (data.status === "error") {
+        if (!data.file_path) {
+          updateFileStatusFailed();
+        } else {
+          updateFileStatus(data.file_path, "error", data);
+        }
+        addLog(`${data.message}`, "error");
+        setEventErr(true);
+        es.close();
+      } else if (data.status === "started") {
+        // Job picked up from queue, pipeline is now running
+        addLog(`Processing started`, "info");
+        updateFileStatusProcessing();
+      } else {
+        // Processing progress event
+        setOverallProgress(data.percentage ?? 0);
+        setTotalFiles(data.total);
+        setCompletedFiles(data.current);
+        setProcessingFile(data.file_path);
+        addLog(`Processing started for ${data.file_path}`, "info");
+        updateFileStatus(data.file_path, "completed", data);
+      }
+    };
+
+    es.onerror = () => {
+      // EventSource auto-reconnects — Last-Event-ID is sent automatically
+      // so your backend buffer replay kicks in seamlessly
+      console.warn("SSE connection lost, reconnecting...");
+    };
+    // Store so we can close on unmount or new job
+    abortControllerRef.current = {
+      abort: () => {
+        es.close();
+      },
+    };
+  };
+
+  const updateFileStatus = (
+    fileNameFromBackend,
+    newStatus,
+    backendResponse,
+  ) => {
+    setFiles((prevFiles) =>
+      prevFiles.map(
+        (file) =>
+          file.name === fileNameFromBackend
+            ? {
+                ...file,
+                status: newStatus,
+                method: backendResponse.method,
+                progress: 100,
+              } // Update matching file
+            : file, // Keep other files as they are
+      ),
+    );
+    addLog(`Processing completed for ${fileNameFromBackend}`, "info");
+  };
+
+  const updateFileStatusFailed = () => {
+    setFiles((prevFiles) =>
+      prevFiles.map((f) => ({
+        ...f,
+        status: "failed",
+      })),
+    );
+  };
+
+  const updateFileStatusProcessing = () => {
+    setFiles((prevFiles) =>
+      prevFiles.map((f) => ({
+        ...f,
+        status: "processing",
+      })),
+    );
+  };
+
   const startProcessing = useCallback(async () => {
     setIsProcessing(true);
     setIsPaused(false);
     await startExtraction({
-      input_directory: "test-input",
-      output_dir: "extracted_files",
+      input_directory: inputDir,
       workers: 0,
       enable_page_ocr: false,
       page_ocr_workers: 0,
@@ -293,6 +330,8 @@ export function useAppStore() {
       removeNumerics: false,
       lemma: false,
     });
+    setIsProcessing(false);
+
     // const firstQueued = files.find((f) => f.status === "queued");
     // if (firstQueued) {
     //   setFiles((prev) =>
@@ -302,45 +341,7 @@ export function useAppStore() {
     //   );
     //   addLog(`Processing started for ${firstQueued.name}`, "info");
     // }
-    setIsProcessing(false)
-  }, []);
-
-  const startExtraction = async (payload) => {
-    const response = await fetch("http://localhost:8000/extract/stream", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder("utf-8");
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      // Decode the chunk (looks like "data: {"status":"processing"...}\n\n")
-      const chunk = decoder.decode(value, { stream: true });
-
-      // Parse out the JSON data
-      const lines = chunk
-        .split("\n")
-        .filter((line) => line.startsWith("data: "));
-      for (const line of lines) {
-        const data = JSON.parse(line.replace("data: ", ""));
-        if (data.status === "completed") {
-          console.log("Done!");
-        } else {
-          setOverallProgress(data.percentage && data.percentage);
-          setTotalFiles(data.total);
-          setCompletedFiles(data.current);
-          setProcessingFile(data.file_path);
-          console.log("Progress:", data);
-        }
-      }
-    }
-  };
+  }, [inputDir]);
 
   const searchResults: SearchResult[] = searchQuery
     ? files
@@ -392,9 +393,8 @@ export function useAppStore() {
     processingFile,
     overallProgress,
     searchResults,
+    eventErr,
     setCurrentView,
-    toggleFileSelection,
-    selectAllFiles,
     removeFile,
     retryFile,
     addFiles,
