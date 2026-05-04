@@ -49,7 +49,7 @@ interface Props {
   selectedFiles: Set<string>;
   onRemove: (id: string) => void;
   onRetry: (id: string) => void;
-  onAddFiles: (names: React.ChangeEvent<HTMLInputElement>) => void;
+  dropFiles: (event: React.DragEvent<Element>) => void;
 }
 
 export function FileTable({
@@ -57,14 +57,14 @@ export function FileTable({
   selectedFiles,
   onRemove,
   onRetry,
-  onAddFiles,
+  dropFiles,
 }: Props) {
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
-      onAddFiles(e)
+      dropFiles(e)
     },
-    [onAddFiles],
+    [dropFiles],
   );
 
   if (files.length === 0) {
@@ -96,6 +96,7 @@ export function FileTable({
       <Table>
         <TableHeader>
           <TableRow className="border-border/50 hover:bg-transparent">
+            <TableHead className="w-28">Batch ID</TableHead>
             <TableHead>File Name</TableHead>
             <TableHead className="w-28">Method</TableHead>
             <TableHead className="w-28">Status</TableHead>
@@ -118,6 +119,13 @@ export function FileTable({
                   selectedFiles.has(file.id) && "bg-secondary/50",
                 )}
               >
+                <TableCell>
+                  <span
+                    className="text-xs font-medium text-muted-foreground"
+                  >
+                    {file.batchId.substring(0, 8) }
+                  </span>
+                </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <FileText className="h-4 w-4 text-muted-foreground shrink-0" />

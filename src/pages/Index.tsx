@@ -27,7 +27,7 @@ const Index = () => {
           <AppHeader
             globalSearch={store.globalSearch}
             onGlobalSearchChange={store.setGlobalSearch}
-            handleFileChange={store.addFiles}
+            handleFileChange={store.importFiles}
           />
           <div className="p-4 space-y-4">
             {(store.currentView === "dashboard" ||
@@ -52,7 +52,7 @@ const Index = () => {
                   selectedFiles={store.selectedFiles}
                   onRemove={store.removeFile}
                   onRetry={store.retryFile}
-                  onAddFiles={store.addFiles}
+                  dropFiles={store.dropFiles}
                 />
 
                 <LogsPanel
@@ -61,6 +61,7 @@ const Index = () => {
                   onToggleAutoscroll={() =>
                     store.setLogsAutoscroll(!store.logsAutoscroll)
                   }
+                  saveLog={store.saveLog}
                 />
               </>
             )}
@@ -86,7 +87,9 @@ const Index = () => {
 
         <SettingsPanel
           settings={store.settings}
+          applyAll={store.applyAll}
           onUpdate={store.updateSetting}
+          onAllUpdate={store.updateAllSetting}
         />
       </div>
     </div>
