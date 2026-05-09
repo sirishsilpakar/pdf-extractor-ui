@@ -1,4 +1,4 @@
-import { Pause, Play, Square, Zap } from "lucide-react";
+import { Play, Square, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { motion } from "framer-motion";
@@ -22,10 +22,7 @@ interface Props {
   completedFiles: number;
   processingFile?: string;
   isProcessing: boolean;
-  isPaused: boolean;
   eventErr: boolean;
-  onPause: () => void;
-  onResume: () => void;
   onCancel: () => void;
   onStart: () => void;
 }
@@ -36,71 +33,54 @@ export function ProcessingDashboard({
   completedFiles,
   processingFile,
   isProcessing,
-  isPaused,
   eventErr,
-  onPause,
-  onResume,
   onCancel,
   onStart,
 }: Props) {
   const remaining = totalFiles - completedFiles;
   const [t, setT] = useState(0);
-  const i = useRef(null);
-  const totalFileCount = useMemo(() => {
-    return (totalFiles - completedFiles)
-  },[totalFiles, completedFiles])
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const start = () => {
-    clearInterval(i.current);
-    i.current = setInterval(() => setT((v) => v + 1), 1000);
-  };
-  const stop = () => clearInterval(i.current);
   useEffect(() => {
-    if ((totalFiles - completedFiles === 0) || eventErr) stop();
-  }, [totalFiles, completedFiles, eventErr]);
+    if (isProcessing && !timerRef.current) {
+      timerRef.current = setInterval(() => setT((v) => v + 1), 1000);
+    } else if (!isProcessing && timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [isProcessing]);
+
+  useEffect(() => {
+    if (eventErr) {
+      if (timerRef.current) clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  }, [eventErr]);
+
   const eta = remaining > 0 ? `~${Math.floor(remaining * Math.PI)}s` : "0s";
 
   return (
     <div className="glass rounded-2xl p-5 space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Zap className="h-4 w-4 text-accent" />
+          <Zap className="h-4 w-4 text-accent" aria-hidden="true" />
           <h2 className="font-semibold text-sm">
             Processing Dashboard
           </h2>
         </div>
         <div className="flex items-center gap-1.5">
-          {isProcessing && !isPaused && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="rounded-xl gap-1 text-xs"
-              onClick={onPause}
-            >
-              <Pause className="h-3 w-3" /> Pause
-            </Button>
-          )}
-          {isProcessing && isPaused && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="rounded-xl gap-1 text-xs"
-              onClick={onResume}
-            >
-              <Play className="h-3 w-3" /> Resume
-            </Button>
-          )}
           {!isProcessing && (
             <Button
               size="sm"
               className="rounded-xl gap-1 text-xs"
-              onClick={() => {
-                onStart();
-                start();
-              }}
+              onClick={onStart}
               disabled={totalFiles === 0}
+              aria-label="Start Processing"
             >
-              <Play className="h-3 w-3" /> Start
+              <Play className="h-3 w-3" aria-hidden="true" /> Start
             </Button>
           )}
           {isProcessing && (
@@ -110,8 +90,9 @@ export function ProcessingDashboard({
                   variant="destructive"
                   size="sm"
                   className="rounded-xl gap-1 text-xs"
+                  aria-label="Cancel Processing"
                 >
-                  <Square className="h-3 w-3" /> Cancel
+                  <Square className="h-3 w-3" aria-hidden="true" /> Cancel
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent className="rounded-2xl">
@@ -138,20 +119,28 @@ export function ProcessingDashboard({
 
       <div className="space-y-2">
         <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">Overall Progress</span>
+          <span className="text-muted-foreground" id="progress-label">Overall Progress</span>
           <motion.span
             key={overallProgress}
             initial={{ scale: 1.2 }}
             animate={{ scale: 1 }}
             className="font-bold text-primary"
+            aria-live="polite"
           >
             {overallProgress}%
           </motion.span>
         </div>
-        <Progress value={overallProgress} className="h-3 rounded-full" />
+        <Progress 
+          value={overallProgress} 
+          className="h-3 rounded-full" 
+          aria-labelledby="progress-label"
+          aria-valuenow={overallProgress}
+          aria-valuemin={0}
+          aria-valuemax={100}
+        />
       </div>
 
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
           {
             label: "Elapsed",
@@ -163,22 +152,13 @@ export function ProcessingDashboard({
         ].map((s) => (
           <div
             key={s.label}
-            className="bg-secondary/50 rounded-xl p-3 text-center"
+            className="bg-secondary/50 rounded-xl p-3 text-center flex flex-col justify-center"
           >
             <p className="text-xs text-muted-foreground">{s.label}</p>
-            <p className="font-semibold text-sm mt-0.5">{s.value}</p>
+            <p className="font-semibold text-sm mt-0.5" aria-live="polite" aria-atomic="true">{s.value}</p>
           </div>
         ))}
       </div>
-
-      {(totalFileCount != 0) && (
-        <div className="flex items-center gap-2 bg-primary/10 rounded-xl px-3 py-2 text-sm">
-          <div className="w-2 h-2 rounded-full bg-primary animate-pulse-glow" />
-          <span className="text-muted-foreground">{processingFile ? 'Currently processing:' : 'Ready to start the process!' } </span>
-          <span className="font-medium">{processingFile}</span>
-          <span className="ml-auto font-mono text-xs text-primary">0%</span>
-        </div>
-      )}
     </div>
   );
 }

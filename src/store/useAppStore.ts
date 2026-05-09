@@ -1,61 +1,10 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { create } from "zustand";
 import type {
-  PDFFile,
   ProcessingSettings,
   LogEntry,
-  SearchResult,
   NavView,
-  AbortController,
+  PendingFile,
 } from "@/types";
-
-const MOCK_FILES: PDFFile[] = [
-  // {
-  //   id: "1",
-  //   name: "annual-report-2025.pdf",
-  //   size: 4523000,
-  //   status: "queued",
-  //   method: "direct",
-  //   progress: 100,
-  //   addedAt: new Date(),
-  //   extractedText:
-  //     "The annual report covers financial performance, market analysis, and strategic initiatives for the fiscal year 2025. Revenue growth exceeded expectations at 23% year-over-year.",
-  // },
-  // {
-  //   id: "2",
-  //   name: "annual-report-2025.pdf",
-  //   size: 4523000,
-  //   status: "processing",
-  //   method: "direct",
-  //   progress: 100,
-  //   addedAt: new Date(),
-  //   extractedText:
-  //     "The annual report covers financial performance, market analysis, and strategic initiatives for the fiscal year 2025. Revenue growth exceeded expectations at 23% year-over-year.",
-  // },
-  // {
-  //   id: "3",
-  //   name: "annual-report-2025.pdf",
-  //   size: 4523000,
-  //   status: "completed",
-  //   method: "direct",
-  //   progress: 100,
-  //   addedAt: new Date(),
-  //   extractedText:
-  //     "The annual report covers financial performance, market analysis, and strategic initiatives for the fiscal year 2025. Revenue growth exceeded expectations at 23% year-over-year.",
-  // },
-  // {
-  //   id: "4",
-  //   name: "annual-report-2025.pdf",
-  //   size: 4523000,
-  //   status: "failed",
-  //   method: "ocr",
-  //   progress: 100,
-  //   addedAt: new Date(),
-  //   extractedText:
-  //     "The annual report covers financial performance, market analysis, and strategic initiatives for the fiscal year 2025. Revenue growth exceeded expectations at 23% year-over-year.",
-  // },
-];
-
-const MOCK_LOGS: LogEntry[] = [];
 
 const defaultSettings: ProcessingSettings = {
   removeHeader: true,
@@ -65,430 +14,151 @@ const defaultSettings: ProcessingSettings = {
   enableLemmatization: false,
 };
 
-export function useAppStore() {
-  const [files, setFiles] = useState<PDFFile[]>(MOCK_FILES);
-  const [logs, setLogs] = useState<LogEntry[]>(MOCK_LOGS);
-  const [settings, setSettings] = useState<ProcessingSettings>(defaultSettings);
-  const [currentView, setCurrentView] = useState<NavView>("dashboard");
-  const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [globalSearch, setGlobalSearch] = useState("");
-  const [logsAutoscroll, setLogsAutoscroll] = useState(true);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [overallProgress, setOverallProgress] = useState<number>(0);
-  const [totalFiles, setTotalFiles] = useState<number>(0);
-  const [completedFiles, setCompletedFiles] = useState<number>(0);
-  const [processingFile, setProcessingFile] = useState<string>("");
-  const [inputDir, setInputDir] = useState<string>("");
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const [eventErr, setEventErr] = useState<boolean>(false);
-  const [applyAll, setApplyAll] = useState<boolean>(false);
-  // const totalFiles = files.length;
-  // const completedFiles = files.filter((f) => f.status === "completed").length;
-  const failedFiles = files.filter((f) => f.status === "failed").length;
-  // const processingFile = files.find((f) => f.status === "processing");
-  // const overallProgress =
-  //   totalFiles > 0 ? Math.round((completedFiles / totalFiles) * 100) : 0;
-
-  useEffect(() => {
-    getFiles();
-    const savedJobId = localStorage.getItem("job_id");
-    if (!savedJobId) return;
-
-    checkAndReattach(savedJobId);
-  }, []);
-
-  const addLog = useCallback(
-    (message: string, type: LogEntry["type"] = "info") => {
-      setLogs((prev) => [
-        ...prev,
-        {
-          id: String(Date.now() + Math.random()),
-          timestamp: new Date(),
-          message,
-          type,
-        },
-      ]);
-    },
-    [],
-  );
-
-  const removeFile = useCallback((id: string) => {
-    setFiles((prev) => prev.filter((f) => f.id !== id));
-    setSelectedFiles((prev) => {
-      const n = new Set(prev);
-      n.delete(id);
-      return n;
-    });
-  }, []);
-
-  const retryFile = useCallback(
-    (id: string) => {
-      setFiles((prev) =>
-        prev.map((f) =>
-          f.id === id ? { ...f, status: "queued" as const, progress: 0 } : f,
-        ),
-      );
-      addLog(`Retrying file...`, "info");
-    },
-    [addLog],
-  );
-
-  const getFiles = async () => {
-    try {
-      const response = await fetch("http://localhost:8000/files", {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-      });
-      if (!response.ok) {
-        return;
-      }
-      const files = await response.json();
-
-      setFiles(
-        files.map((f) => ({
-          id: f.id,
-          batchId: f.batch_id,
-          name: f.file_name,
-          size: f.size,
-          status: f.status,
-          progress: 100,
-          addedAt: f.addedAt,
-          method: f.method,
-        })),
-      );
-    } catch (e) {
-      console.error("Failed to load file list:", e);
-    }
-  };
-
-  const addFiles = (filesArray) => {
-    // setting error false here
-    // set true when event fails
-    // this stops the elappsed timer
-    setEventErr(false);
-    const filePath = filesArray[0].webkitRelativePath.split("/")[0];
-    setInputDir(filePath);
-    const pdfFiles = filesArray.filter((file) =>
-      file.name.toLowerCase().endsWith(".pdf"),
-    );
-    const newFiles: PDFFile[] = pdfFiles.map((file) => ({
-      id: String(Date.now() + Math.random()),
-      batchId: "",
-      name: file.name,
-      size: file.size,
-      status: "queued" as const,
-      progress: 0,
-      method: "undefined",
-      addedAt: new Date(),
-    }));
-    setFiles((prev) => [...prev, ...newFiles]);
-    setTotalFiles(pdfFiles.length);
-    addLog(`Added ${pdfFiles.length} file(s) to queue`, "info");
-  };
-
-  const dropFiles = (event: React.DragEvent<Element>) => {
-    if (event.dataTransfer.files && event.dataTransfer.files.length > 0) {
-      const droppedFiles = Array.from(event.dataTransfer.files);
-      addFiles(droppedFiles);
-      // Clear the data transfer for the next drop
-      event.dataTransfer.clearData();
-    }
-  };
-
-  const importFiles = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files);
-    addFiles(files);
-  };
-
-  const pauseProcessing = useCallback(() => {
-    setIsPaused(true);
-    addLog("Processing paused", "warning");
-  }, [addLog]);
-
-  const resumeProcessing = useCallback(() => {
-    setIsPaused(false);
-    addLog("Processing resumed", "info");
-  }, [addLog]);
-
-  const cancelProcessing = useCallback(() => {
-    setIsProcessing(false);
-    setIsPaused(false);
-    addLog("Processing cancelled", "error");
-  }, [addLog]);
-
-  const checkAndReattach = async (jobId: string) => {
-    const res = await fetch(`http://localhost:8000/extract/status/${jobId}`);
-    if (!res.ok) {
-      localStorage.removeItem("job_id"); // stale job_id, clean up
-      return;
-    }
-
-    const job = await res.json();
-
-    if (job.status === "running" || job.status === "queued") {
-      // Reattach — buffer replay handles missed events
-      streamExtraction(jobId);
-    } else if (job.status === "completed") {
-      // Restore completed UI state
-      // setOverallProgress(100)
-    } else if (job.status === "failed") {
-      // Show error state
-      console.error("Job failed:", job.error);
-    }
-  };
-
-  const startExtraction = async (payload) => {
-    try {
-      const response = await fetch("http://localhost:8000/extract", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const err = await response.json();
-        addLog(`${err.detail || "Failed to submit job"}`, "error");
-        throw new Error(err.detail || "Failed to submit job");
-      }
-
-      const { job_id, queue_position } = await response.json();
-      localStorage.setItem("job_id", job_id);
-
-      if (queue_position > 1) {
-        addLog(`Queued at position ${queue_position}`, "info");
-      }
-
-      streamExtraction(job_id);
-    } catch (e) {
-      console.error("Extraction failed:", e);
-    }
-  };
-
-  const streamExtraction = (jobId: string) => {
-    // Abort any existing stream before starting a new one
-    abortControllerRef.current?.abort();
-
-    const es = new EventSource(`http://localhost:8000/extract/stream/${jobId}`);
-
-    es.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-
-      if (data.status === "completed") {
-        addLog("Text extraction is completed", "success");
-        es.close();
-      } else if (data.status === "error") {
-        if (!data.file_path) {
-          updateFileStatusFailed();
-        } else {
-          updateFileStatus(data.file_path, "error", data);
-        }
-        addLog(`${data.message}`, "error");
-        setEventErr(true);
-        es.close();
-      } else if (data.status === "started") {
-        // Job picked up from queue, pipeline is now running
-        addLog(`Processing started`, "info");
-        updateFileStatusProcessing();
-      } else {
-        // Processing progress event
-        setOverallProgress(data.percentage ?? 0);
-        setTotalFiles(data.total);
-        setCompletedFiles(data.current);
-        setProcessingFile(data.file_path);
-        addLog(`Processing started for ${data.file_path}`, "info");
-        updateFileStatus(data.file_path, "completed", data);
-      }
-    };
-
-    es.onerror = () => {
-      // EventSource auto-reconnects — Last-Event-ID is sent automatically
-      // so your backend buffer replay kicks in seamlessly
-      console.warn("SSE connection lost, reconnecting...");
-    };
-    // Store so we can close on unmount or new job
-    abortControllerRef.current = {
-      abort: () => {
-        es.close();
-      },
-    };
-  };
-
-  const updateFileStatus = (
-    fileNameFromBackend,
-    newStatus,
-    backendResponse,
-  ) => {
-    setFiles((prevFiles) =>
-      prevFiles.map(
-        (file) =>
-          file.name === fileNameFromBackend
-            ? {
-                ...file,
-                status: newStatus,
-                method: backendResponse.method,
-                progress: 100,
-              } // Update matching file
-            : file, // Keep other files as they are
-      ),
-    );
-    addLog(`Processing completed for ${fileNameFromBackend}`, "info");
-  };
-
-  const updateFileStatusFailed = () => {
-    setFiles((prevFiles) =>
-      prevFiles.map((f) => ({
-        ...f,
-        status: "failed",
-      })),
-    );
-  };
-
-  const updateFileStatusProcessing = () => {
-    setFiles((prevFiles) =>
-      prevFiles.map((f) => ({
-        ...f,
-        status: "processing",
-      })),
-    );
-  };
-
-  const startProcessing = useCallback(async () => {
-    setIsProcessing(true);
-    setIsPaused(false);
-    await startExtraction({
-      input_directory: inputDir,
-      workers: 0,
-      enable_page_ocr: false,
-      page_ocr_workers: 0,
-      force: false,
-      no_ocr: false,
-      fast: false,
-      removeHeader: settings.removeHeader,
-      removeFooter: settings.removeFooter,
-      removePageNumber: settings.removePageNumbers,
-      removeNumerics: settings.removeNumericValues,
-      lemma: settings.enableLemmatization,
-    });
-    setIsProcessing(false);
-  }, [inputDir, settings]);
-
-  const saveLog = async (payload) => {
-     try {
-      const response = await fetch("http://localhost:8000/logs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({logs: payload}),
-      });
-
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.detail || "Failed to save log");
-      }
-      getLogs();
-    } catch (e) {
-      console.error("Extraction failed:", e);
-    }
-  }
-
-  const getLogs = async () => {
-     try {
-      const response = await fetch("http://localhost:8000/logs", {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-      });
-      if (!response.ok) {
-        return;
-      }
-      const files = await response.json();
-      setLogs(
-        files.map((f) => ({
-          id: f.id,
-          timestamp: f.timestamp,
-          message: f.message,
-          type: f.type,
-        })),
-      );
-    } catch (e) {
-      console.error("Failed to load log list:", e);
-    }
-  }
-
-  const searchResults: SearchResult[] = searchQuery
-    ? files
-        .filter((f) =>
-          f.extractedText?.toLowerCase().includes(searchQuery.toLowerCase()),
-        )
-        .map((f) => {
-          const idx = f
-            .extractedText!.toLowerCase()
-            .indexOf(searchQuery.toLowerCase());
-          const start = Math.max(0, idx - 40);
-          const end = Math.min(
-            f.extractedText!.length,
-            idx + searchQuery.length + 40,
-          );
-          return {
-            fileId: f.id,
-            fileName: f.name,
-            snippet: f.extractedText!.slice(start, end),
-            matchIndex: idx,
-          };
-        })
-    : [];
-
-  const updateAllSetting = useCallback((value) => {
-    setApplyAll(value);
-    Object.keys(defaultSettings).forEach((key) => {
-      setSettings((prev) => ({ ...prev, [key]: value }));
-    });
-  }, []);
-
-  const updateSetting = useCallback(
-    <K extends keyof ProcessingSettings>(
-      key: K,
-      value: ProcessingSettings[K],
-    ) => {
-      setSettings((prev) => ({ ...prev, [key]: value }));
-    },
-    [],
-  );
-
-  return {
-    files,
-    logs,
-    settings,
-    currentView,
-    selectedFiles,
-    isProcessing,
-    isPaused,
-    searchQuery,
-    globalSearch,
-    logsAutoscroll,
-    totalFiles,
-    completedFiles,
-    failedFiles,
-    processingFile,
-    overallProgress,
-    searchResults,
-    eventErr,
-    applyAll,
-    saveLog,
-    dropFiles,
-    setCurrentView,
-    removeFile,
-    retryFile,
-    importFiles,
-    pauseProcessing,
-    resumeProcessing,
-    cancelProcessing,
-    startProcessing,
-    setSearchQuery,
-    setGlobalSearch,
-    setLogsAutoscroll,
-    updateAllSetting,
-    updateSetting,
-  };
+interface UIState {
+  currentView: NavView;
+  setCurrentView: (view: NavView) => void;
+  logsAutoscroll: boolean;
+  setLogsAutoscroll: (val: boolean) => void;
+  searchQuery: string;
+  setSearchQuery: (q: string) => void;
+  globalSearch: string;
+  setGlobalSearch: (q: string) => void;
+  resultsRunFilter: string | null;
+  setResultsRunFilter: (runId: string | null) => void;
 }
+
+interface SelectionState {
+  selectedFiles: Set<string>;
+  toggleFileSelection: (id: string) => void;
+  clearFileSelection: () => void;
+}
+
+interface SettingsState {
+  settings: ProcessingSettings;
+  updateSetting: <K extends keyof ProcessingSettings>(key: K, value: ProcessingSettings[K]) => void;
+}
+
+interface LogState {
+  logs: LogEntry[];
+  addLog: (message: string, type?: LogEntry["type"]) => void;
+  clearLogs: () => void;
+}
+
+interface PendingFilesState {
+  pendingFiles: PendingFile[];
+  setPendingFiles: (files: PendingFile[] | ((prev: PendingFile[]) => PendingFile[])) => void;
+  removePendingFile: (id: string) => void;
+  registeredRefIds: string[];
+  setRegisteredRefIds: (ids: string[] | ((prev: string[]) => string[])) => void;
+  registeredPaths: { id: string; path: string; pdfCount: number; alreadyProcessedCount: number }[];
+  setRegisteredPaths: (paths: { id: string; path: string; pdfCount: number; alreadyProcessedCount: number }[] | ((prev: { id: string; path: string; pdfCount: number; alreadyProcessedCount: number }[]) => { id: string; path: string; pdfCount: number; alreadyProcessedCount: number }[])) => void;
+}
+
+interface ReprocessState {
+  showReprocessModal: boolean;
+  setShowReprocessModal: (val: boolean) => void;
+  reprocessData: { hashes: string[]; alreadyHashes: string[]; totalItems: number; alreadyCount: number } | null;
+  setReprocessData: (data: { hashes: string[]; alreadyHashes: string[]; totalItems: number; alreadyCount: number } | null) => void;
+}
+
+interface SSEState {
+  isProcessing: boolean;
+  setIsProcessing: (val: boolean) => void;
+  overallProgress: number;
+  setOverallProgress: (val: number) => void;
+  totalFiles: number;
+  setTotalFiles: (val: number) => void;
+  completedFiles: number;
+  setCompletedFiles: (val: number) => void;
+  processingFile: string;
+  setProcessingFile: (val: string) => void;
+  currentRunId: string | null;
+  setCurrentRunId: (val: string | null) => void;
+}
+
+type AppState = UIState & SelectionState & SettingsState & LogState & PendingFilesState & ReprocessState & SSEState;
+
+export const useAppStore = create<AppState>((set, get) => ({
+  // UI State
+  currentView: "dashboard",
+  setCurrentView: (view) => set({ currentView: view }),
+  logsAutoscroll: true,
+  setLogsAutoscroll: (val) => set({ logsAutoscroll: val }),
+  searchQuery: "",
+  setSearchQuery: (q) => set({ searchQuery: q }),
+  globalSearch: "",
+  setGlobalSearch: (q) => set({ globalSearch: q }),
+  resultsRunFilter: null,
+  setResultsRunFilter: (runId) => set({ resultsRunFilter: runId }),
+
+  // Selection State
+  selectedFiles: new Set(),
+  toggleFileSelection: (id) => set((state) => {
+    const newSet = new Set(state.selectedFiles);
+    if (newSet.has(id)) newSet.delete(id);
+    else newSet.add(id);
+    return { selectedFiles: newSet };
+  }),
+  clearFileSelection: () => set({ selectedFiles: new Set() }),
+
+  // Settings State
+  settings: defaultSettings,
+  updateSetting: (key, value) => set((state) => ({
+    settings: { ...state.settings, [key]: value },
+  })),
+
+  // Log State
+  logs: [],
+  addLog: (message, type = "info") => set((state) => ({
+    logs: [
+      ...state.logs,
+      { id: String(Date.now() + Math.random()), timestamp: new Date(), message, type },
+    ].slice(-500),
+  })),
+  clearLogs: () => set({ logs: [] }),
+
+  // Pending Files
+  pendingFiles: [],
+  setPendingFiles: (filesOrFn) => set((state) => ({
+    pendingFiles: typeof filesOrFn === "function" ? filesOrFn(state.pendingFiles) : filesOrFn
+  })),
+  removePendingFile: (id) => set((state) => ({
+    pendingFiles: state.pendingFiles.filter((f) => f.id !== id),
+    registeredPaths: state.registeredPaths.filter((p) => {
+      if (p.id === id) {
+        // Also remove from ref ids
+        set({ registeredRefIds: state.registeredRefIds.filter(rid => rid !== p.id) });
+        return false;
+      }
+      return true;
+    })
+  })),
+  registeredRefIds: [],
+  setRegisteredRefIds: (idsOrFn) => set((state) => ({
+    registeredRefIds: typeof idsOrFn === "function" ? idsOrFn(state.registeredRefIds) : idsOrFn
+  })),
+  registeredPaths: [],
+  setRegisteredPaths: (pathsOrFn) => set((state) => ({
+    registeredPaths: typeof pathsOrFn === "function" ? pathsOrFn(state.registeredPaths) : pathsOrFn
+  })),
+
+  // Reprocess State
+  showReprocessModal: false,
+  setShowReprocessModal: (val) => set({ showReprocessModal: val }),
+  reprocessData: null,
+  setReprocessData: (data) => set({ reprocessData: data }),
+
+  // SSE State
+  isProcessing: false,
+  setIsProcessing: (val) => set({ isProcessing: val }),
+  overallProgress: 0,
+  setOverallProgress: (val) => set({ overallProgress: val }),
+  totalFiles: 0,
+  setTotalFiles: (val) => set({ totalFiles: val }),
+  completedFiles: 0,
+  setCompletedFiles: (val) => set({ completedFiles: val }),
+  processingFile: "",
+  setProcessingFile: (val) => set({ processingFile: val }),
+  currentRunId: null,
+  setCurrentRunId: (val) => set({ currentRunId: val }),
+}));

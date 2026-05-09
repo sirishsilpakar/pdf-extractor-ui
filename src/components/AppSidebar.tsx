@@ -4,7 +4,9 @@ import {
   Search,
   Settings,
   PanelRight,
-  Terminal
+  Terminal,
+  History,
+  ClipboardList
 } from "lucide-react";
 import type { NavView } from "@/types";
 import { cn } from "@/lib/utils";
@@ -12,11 +14,12 @@ import { useState } from "react";
 
 const navItems: { id: NavView; label: string; icon: React.ElementType }[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { id: "files", label: "Files", icon: Files },
-  { id: "activity", label: "Activity Log", icon: Terminal },
+  { id: "runs", label: "Runs", icon: History },
+  { id: "results", label: "Files", icon: Files },
   { id: "search", label: "Search", icon: Search },
   { id: "settings", label: "Settings", icon: Settings },
 ];
+
 
 interface AppSidebarProps {
   currentView: NavView;

@@ -1,7 +1,7 @@
-import { useEffect, useRef } from "react";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { useEffect, useRef, useCallback } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { Button } from "@/components/ui/button";
-import { FileDown, Save, Terminal } from "lucide-react";
+import { FileDown, Terminal } from "lucide-react";
 import type { LogEntry } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -23,15 +23,31 @@ interface Props {
   logs: LogEntry[];
   autoscroll: boolean;
   onToggleAutoscroll: () => void;
-  saveLog: () => void;
 }
 
-export function LogsPanel({ logs, autoscroll, onToggleAutoscroll, saveLog }: Props) {
-  const bottomRef = useRef<HTMLDivElement>(null);
+export function LogsPanel({ logs, autoscroll, onToggleAutoscroll }: Props) {
+  const parentRef = useRef<HTMLDivElement>(null);
+  
+  const rowVirtualizer = useVirtualizer({
+    count: logs.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 24, // Approximate height of one log row
+    overscan: 10,
+  });
 
   useEffect(() => {
-    if (autoscroll) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [logs, autoscroll]);
+    if (autoscroll && logs.length > 0) {
+      rowVirtualizer.scrollToIndex(logs.length - 1, { align: "end" });
+    }
+  }, [logs.length, autoscroll, rowVirtualizer]);
+
+  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    const isAtBottom = target.scrollHeight - target.scrollTop <= target.clientHeight + 20;
+    if (!isAtBottom && autoscroll) {
+      onToggleAutoscroll();
+    }
+  }, [autoscroll, onToggleAutoscroll]);
 
   return (
     <div
@@ -40,54 +56,87 @@ export function LogsPanel({ logs, autoscroll, onToggleAutoscroll, saveLog }: Pro
     >
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/50">
         <div className="flex items-center gap-2">
-          <Terminal className="h-4 w-4 text-accent" />
+          <Terminal className="h-4 w-4 text-accent" aria-hidden="true" />
           <h3 className="font-semibold text-sm">Activity Log</h3>
-          <span className="text-xs text-muted-foreground">
+          <span className="text-xs text-muted-foreground" aria-live="polite" aria-atomic="true">
             ({logs.length} entries)
           </span>
         </div>
-        <div className="flex items-center">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="rounded-xl gap-1 text-xs h-7"
-            onClick={saveLog}
-          >
-            <Save className="h-3 w-3" /> Save
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="rounded-xl gap-1 text-xs h-7"
-            onClick={onToggleAutoscroll}
-          >
-            <FileDown className="h-3 w-3" /> Export
-          </Button>
-        </div>
-
-        {/* <Button variant="ghost" size="sm" className="rounded-xl gap-1 text-xs h-7" onClick={onToggleAutoscroll}>
-          {autoscroll ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
-          {autoscroll ? 'Pause' : 'Resume'}
-        </Button> */}
-      </div>
-      <ScrollArea className="flex-1 px-4 py-2">
-        <div className="space-y-0.5 font-mono-logs text-xs">
-          {logs.map((log) => (
-            <div key={log.id} className="flex gap-2 py-0.5">
-              <span className="text-muted-foreground/60 shrink-0">
-                {log.timestamp.toLocaleTimeString()}
-              </span>
-              <span
-                className={cn("shrink-0 font-semibold", typeColors[log.type])}
+        <div className="flex items-center gap-1">
+          {!autoscroll && (
+             <Button
+                variant="ghost"
+                size="sm"
+                className="rounded-xl gap-1 text-[10px] h-6 px-2 bg-accent/20 text-accent animate-pulse"
+                onClick={onToggleAutoscroll}
+                aria-label="Resume auto-scroll"
               >
-                [{typePrefix[log.type]}]
-              </span>
-              <span className={cn(typeColors[log.type])}>{log.message}</span>
-            </div>
-          ))}
-          <div ref={bottomRef} />
+                Resume Auto-scroll
+              </Button>
+          )}
+
+          <Button
+            variant="ghost"
+            size="sm"
+            className="rounded-xl gap-1 text-xs h-7"
+            onClick={() => {
+              const text = logs.map(l => `[${l.timestamp.toLocaleTimeString()}] [${typePrefix[l.type]}] ${l.message}`).join("\n");
+              const blob = new Blob([text], { type: 'text/plain' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `logs-${new Date().getTime()}.txt`;
+              a.click();
+            }}
+            aria-label="Export logs to file"
+          >
+            <FileDown className="h-3 w-3" aria-hidden="true" /> Export
+          </Button>
         </div>
-      </ScrollArea>
+      </div>
+      <div 
+        ref={parentRef}
+        className="flex-1 px-4 py-2 overflow-y-auto no-scrollbar"
+        onScroll={handleScroll}
+        aria-live="polite"
+        role="log"
+      >
+        <div 
+          style={{ 
+            height: `${rowVirtualizer.getTotalSize()}px`, 
+            width: '100%', 
+            position: 'relative' 
+          }}
+          className="font-mono-logs text-xs"
+        >
+          {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+            const log = logs[virtualRow.index];
+            return (
+              <div
+                key={virtualRow.index}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: `${virtualRow.size}px`,
+                  transform: `translateY(${virtualRow.start}px)`,
+                }}
+                className="flex gap-2 py-0.5 items-center"
+              >
+                <span className="text-muted-foreground/60 shrink-0">
+                  {log.timestamp.toLocaleTimeString()}
+                </span>
+                <span className={cn("shrink-0 font-semibold", typeColors[log.type])}>
+                  [{typePrefix[log.type]}]
+                </span>
+                <span className={cn(typeColors[log.type], "truncate")}>{log.message}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
+
