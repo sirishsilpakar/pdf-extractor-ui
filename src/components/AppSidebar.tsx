@@ -32,7 +32,7 @@ export function AppSidebar({
   onViewChange,
   stats,
 }: AppSidebarProps) {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   return (
     <aside
       className={`${sidebarCollapsed ? "w-16" : "w-56"} border-r border-border/50 glass flex flex-col shrink-0`}

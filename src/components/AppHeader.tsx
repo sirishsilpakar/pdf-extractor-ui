@@ -7,7 +7,6 @@ interface AppHeaderProps {
   globalSearch: string;
   onGlobalSearchChange: (v: string) => void;
   onSearchSubmit: (v: string) => void;
-  handleFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onAddPath: (path: string) => void;
 }
 
@@ -15,7 +14,6 @@ export function AppHeader({
   globalSearch,
   onGlobalSearchChange,
   onSearchSubmit,
-  handleFileChange,
   onAddPath,
 }: AppHeaderProps) {
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -26,7 +24,7 @@ export function AppHeader({
 
   return (
     <header className="min-h-14 border-b border-border/50 glass-strong flex flex-col md:flex-row items-start md:items-center px-4 py-2 gap-3 shrink-0">
-      <PathImporter handleFileChange={handleFileChange} onAddPath={onAddPath} />
+      <PathImporter onAddPath={onAddPath} />
 
       <div className="flex-1 w-full max-w-md md:ml-auto md:mr-3 relative mt-2 md:mt-0">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
