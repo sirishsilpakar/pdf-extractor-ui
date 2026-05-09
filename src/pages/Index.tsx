@@ -249,9 +249,6 @@ const Index = () => {
               store.setCurrentView("search");
               store.setSearchQuery(v);
             }}
-            handleFileChange={(e) => {
-              if (e.target.files) handleAddFiles(e.target.files);
-            }}
             onAddPath={handleRegisterPath}
           />
 
