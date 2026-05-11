@@ -85,6 +85,7 @@ const Index = () => {
         total: number;
         pages: number;
       }>(url);
+      store.setTotalFiles(data.total);
       return {
         items: (data.items || []) as FilesListItem[],
         pagination: {
@@ -106,7 +107,7 @@ const Index = () => {
   // After we get job status done from Batch processing stream
   const pendingFiles = useMemo(() => {
     if (!batchStatusData?.items?.length) return [];
-    return batchStatusData.items.map((f) => ({
+    const data = batchStatusData.items.map((f) => ({
       id: f.content_hash,
       name: f.name,
       hash: f.content_hash,
@@ -114,6 +115,7 @@ const Index = () => {
       relPath: f.rel_path,
       isAlreadyRegistered: true,
     }));
+    store.setPendingFiles(data);
   }, [batchStatusData]);
 
   // Helper actions that were previously in store
@@ -201,6 +203,7 @@ const Index = () => {
     force = false,
     skipDuplicates = false,
   ) => {
+    console.log(store.pendingFiles, "@@pendingFiles");
     // 0. Duplicate Check
     if (!force && !skipDuplicates) {
       const hashes = store.pendingFiles
@@ -360,7 +363,7 @@ const Index = () => {
 
                 <FileTable
                   files={store.isProcessing ? jobFiles?.items || [] : []}
-                  pendingFiles={batchId ? pendingFiles : store.pendingFiles}
+                  pendingFiles={store.pendingFiles}
                   pagination={
                     batchStatusData?.pagination || {
                       page: 1,
