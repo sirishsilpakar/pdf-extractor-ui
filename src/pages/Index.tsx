@@ -203,7 +203,6 @@ const Index = () => {
     force = false,
     skipDuplicates = false,
   ) => {
-    console.log(store.pendingFiles, "@@pendingFiles");
     // 0. Duplicate Check
     if (!force && !skipDuplicates) {
       const hashes = store.pendingFiles
