@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { AppSidebar } from "@/components/AppSidebar";
 import { ProcessingDashboard } from "@/components/ProcessingDashboard";
@@ -13,11 +13,22 @@ import { useAppStore } from "@/store/useAppStore";
 import { getFilesFromDataTransfer } from "@/lib/fileDrop";
 import { hashFile } from "@/lib/hashing";
 import { useSSE } from "@/hooks/useSSE";
-import { useJobStatus, useJobFiles, useCancelJob, useStartJob } from "@/hooks/queries/useJob";
+import {
+  useJobStatus,
+  useJobFiles,
+  useCancelJob,
+  useStartJob,
+} from "@/hooks/queries/useJob";
 import { useRuns, useRunLog } from "@/hooks/queries/useRuns";
-import { useResults, useResultDetail, getDownloadUrl } from "@/hooks/queries/useResults";
+import {
+  useResults,
+  useResultDetail,
+  getDownloadUrl,
+} from "@/hooks/queries/useResults";
 import { useSearch, useReindexSearch } from "@/hooks/queries/useSearch";
-import { API_BASE, fetcher } from "@/lib/api";
+import { API_BASE, BATCH_SSE_URL, fetcher } from "@/lib/api";
+import { useQuery } from "@tanstack/react-query";
+import { FilesListItem, PaginationState } from "@/types";
 
 const Index = () => {
   const store = useAppStore();
@@ -27,29 +38,94 @@ const Index = () => {
   const [runsPage, setRunsPage] = useState(1);
   const [searchPage, setSearchPage] = useState(1);
   const [filesPage, setFilesPage] = useState(1);
+  const [batchId, setBatchId] = useState("");
+  const [page, setPage] = useState(1);
+  const [size, setSize] = useState(10);
 
   // Reset page on filter/query change
-  useEffect(() => { setResultsPage(1); }, [store.resultsRunFilter]);
-  useEffect(() => { setSearchPage(1); }, [store.searchQuery]);
+  useEffect(() => {
+    setResultsPage(1);
+  }, [store.resultsRunFilter]);
+  useEffect(() => {
+    setSearchPage(1);
+  }, [store.searchQuery]);
 
   // Queries
   const { data: jobStatus } = useJobStatus();
-  const { data: jobFiles, isPending: isFilesLoading } = useJobFiles(filesPage, 10, store.isProcessing);
+  const { data: jobFiles, isPending: isFilesLoading } = useJobFiles(
+    filesPage,
+    10,
+    store.isProcessing,
+  );
   const { data: runsData, isPending: isRunsLoading } = useRuns(runsPage, 10);
-  const { data: resultsData, isPending: isResultsLoading, refetch: refetchResults } = useResults(store.resultsRunFilter, resultsPage, 10);
-  const { data: searchData, isPending: isSearchLoading } = useSearch(store.searchQuery, searchPage, 10);
+  const {
+    data: resultsData,
+    isPending: isResultsLoading,
+    refetch: refetchResults,
+  } = useResults(store.resultsRunFilter, resultsPage, 10);
+  const { data: searchData, isPending: isSearchLoading } = useSearch(
+    store.searchQuery,
+    searchPage,
+    10,
+  );
+
+  const {
+    data: batchStatusData,
+    isPending: isBatchStatusPending,
+    error: batchStatusError,
+  } = useQuery({
+    queryKey: ["batchStatus", batchId, page, size],
+    enabled: !!batchId,
+    queryFn: async () => {
+      const url = `/batches/${batchId}/files?page=${page}&size=${size}`;
+      const data = await fetcher<{
+        items: FilesListItem[];
+        page: number;
+        size: number;
+        total: number;
+        pages: number;
+      }>(url);
+      store.setTotalFiles(data.total);
+      return {
+        items: (data.items || []) as FilesListItem[],
+        pagination: {
+          page: page,
+          size: size,
+          total: data.total || 0,
+          pages: data.pages || 1,
+        } as PaginationState,
+      };
+    },
+    placeholderData: (prev) => prev,
+  });
 
   // Mutations
   const { mutate: cancelJob } = useCancelJob();
   const { mutate: startJob } = useStartJob();
   const { mutate: reindexSearch } = useReindexSearch();
 
+  // After we get job status done from Batch processing stream
+  const pendingFiles = useMemo(() => {
+    if (!batchStatusData?.items?.length) return [];
+    const data = batchStatusData.items.map((f) => ({
+      id: f.content_hash,
+      name: f.name,
+      hash: f.content_hash,
+      size: f.size_bytes,
+      relPath: f.rel_path,
+      isAlreadyRegistered: true,
+    }));
+    store.setPendingFiles(data);
+  }, [batchStatusData]);
+
   // Helper actions that were previously in store
   const handleAddFiles = async (fileList: FileList | File[]) => {
-    const newFiles = Array.from(fileList).filter(f => f.name.toLowerCase().endsWith(".pdf"));
+    const newFiles = Array.from(fileList).filter((f) =>
+      f.name.toLowerCase().endsWith(".pdf"),
+    );
     if (newFiles.length === 0) return;
 
-    const entries = newFiles.map(f => {
+    const entries = newFiles.map((f) => {
       const absPath = (f as File & { path?: string }).path || "";
       const relPath = f.webkitRelativePath || f.name;
       return {
@@ -61,68 +137,77 @@ const Index = () => {
       };
     });
 
-    store.setPendingFiles(prev => [...prev, ...entries]);
+    store.setPendingFiles((prev) => [...prev, ...entries]);
     store.setCurrentView("dashboard");
     store.setTotalFiles(entries.length);
     store.setCompletedFiles(0);
     store.setOverallProgress(0);
-    store.addLog(`Added ${entries.length} file(s). Calculating hashes...`, "info");
+    store.addLog(
+      `Added ${entries.length} file(s). Calculating hashes...`,
+      "info",
+    );
 
     for (const entry of entries) {
       const hash = await hashFile(entry.file as File);
       entry.hash = hash;
-      store.setPendingFiles(prev => prev.map(p => p.id === entry.id ? { ...p, hash } : p));
+      store.setPendingFiles((prev) =>
+        prev.map((p) => (p.id === entry.id ? { ...p, hash } : p)),
+      );
     }
     store.addLog(`Hashing completed for ${entries.length} files.`, "success");
   };
 
   const handleRegisterPath = async (path: string) => {
     try {
-      const res = await fetch(`${API_BASE}/upload/reference`, {
+      const res = await fetch(`${API_BASE}/batches`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ path }),
       });
       if (!res.ok) {
         const err = await res.json();
-        store.addLog(`Path registration failed: ${err.detail || res.statusText}`, "error");
+        store.addLog(
+          `Path registration failed: ${err.detail || res.statusText}`,
+          "error",
+        );
         return;
       }
       const data = await res.json();
-      
-      if (data.files && data.files.length > 0) {
-        const newEntries = data.files.map((f: { name: string; content_hash: string; size_bytes: number; rel_path: string }) => ({
-          id: `ref-${Math.random().toString(36).substring(2, 9)}`,
-          name: f.name,
-          hash: f.content_hash,
-          size: f.size_bytes,
-          relPath: f.rel_path,
-          absPath: path,
-          isAlreadyRegistered: true,
-          isReference: true,
-          refId: data.ref_id as string,
-        }));
-        store.setPendingFiles(prev => [...prev, ...newEntries]);
+      if (data.batch_id) {
+        getBatchStatusStream();
       }
-
-      store.setRegisteredRefIds(prev => [...prev, data.ref_id]);
-      store.setRegisteredPaths(prev => [...prev, { 
-        id: data.ref_id, 
-        path, 
-        pdfCount: data.pdf_count,
-        alreadyProcessedCount: data.already_processed_count || 0
-      }]);
-      store.addLog(`Registered local path: ${path}`, "success");
-      store.setCurrentView("dashboard");
     } catch (e) {
       store.addLog(`Failed to register path: ${e}`, "error");
     }
   };
 
-  const handleStartProcessing = async (force = false, skipDuplicates = false) => {
+  const getBatchStatusStream = () => {
+    const eventSource = new EventSource(BATCH_SSE_URL);
+    eventSource.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.scan_status === "done") {
+        setBatchId(data.batch_id);
+        store.addLog(`Batch ready to process`, "info");
+      }
+    };
+    eventSource.onerror = () => {
+      store.addLog(`Event stream failed for batch processing.`, "success");
+      eventSource.close();
+    };
+    return () => {
+      eventSource.close();
+    };
+  };
+
+  const handleStartProcessing = async (
+    force = false,
+    skipDuplicates = false,
+  ) => {
     // 0. Duplicate Check
     if (!force && !skipDuplicates) {
-      const hashes = store.pendingFiles.map(p => p.hash).filter(Boolean) as string[];
+      const hashes = store.pendingFiles
+        .map((p) => p.hash)
+        .filter(Boolean) as string[];
       if (hashes.length > 0) {
         try {
           const checkRes = await fetch(`${API_BASE}/upload/check-hashes`, {
@@ -139,7 +224,7 @@ const Index = () => {
               hashes,
               alreadyHashes,
               totalItems: store.pendingFiles.length,
-              alreadyCount: alreadyHashes.length
+              alreadyCount: alreadyHashes.length,
             });
             store.setShowReprocessModal(true);
             return; // STOP HERE: wait for user decision in modal
@@ -151,16 +236,22 @@ const Index = () => {
     }
 
     // 1. Separate files to upload vs references
-    const filesToUpload = store.pendingFiles.filter(pf => !pf.isReference && pf.file);
+    const filesToUpload = store.pendingFiles.filter(
+      (pf) => !pf.isReference && pf.file,
+    );
     let uploadedIds: string[] = [];
 
     if (filesToUpload.length > 0) {
       store.addLog(`Uploading ${filesToUpload.length} files...`, "info");
       try {
         const formData = new FormData();
-        filesToUpload.forEach(pf => {
+        filesToUpload.forEach((pf) => {
           // Send as 'files', using the webkitRelativePath if available to preserve structure
-          formData.append("files", pf.file as Blob, pf.relPath || pf.file!.name);
+          formData.append(
+            "files",
+            pf.file as Blob,
+            pf.relPath || pf.file!.name,
+          );
         });
 
         const res = await fetch(`${API_BASE}/upload`, {
@@ -169,7 +260,7 @@ const Index = () => {
         });
 
         if (!res.ok) throw new Error("Upload failed");
-        
+
         const data = await res.json();
         uploadedIds = data.map((f: { file_id: string }) => f.file_id);
         store.addLog("Upload complete.", "success");
@@ -183,7 +274,7 @@ const Index = () => {
     // 2. Prepare selected_files payload for references
     const selectedFilesPayload: Record<string, string[]> = {};
     if (store.registeredRefIds.length > 0) {
-      const refPending = store.pendingFiles.filter(pf => pf.isReference);
+      const refPending = store.pendingFiles.filter((pf) => pf.isReference);
       for (const pf of refPending) {
         if (pf.refId) {
           if (!selectedFilesPayload[pf.refId]) {
@@ -199,10 +290,13 @@ const Index = () => {
     // 3. Start Job
     startJob({
       file_ids: [...uploadedIds, ...store.registeredRefIds],
-      selected_files: Object.keys(selectedFilesPayload).length > 0 ? selectedFilesPayload : null,
+      selected_files:
+        Object.keys(selectedFilesPayload).length > 0
+          ? selectedFilesPayload
+          : null,
       force,
     });
-    
+
     // Clear pending files to UI transition into dashboard
     store.setPendingFiles([]);
     store.setRegisteredRefIds([]);
@@ -267,16 +361,28 @@ const Index = () => {
                 />
 
                 <FileTable
-                  files={store.isProcessing ? (jobFiles?.items || []) : []}
+                  files={store.isProcessing ? jobFiles?.items || [] : []}
                   pendingFiles={store.pendingFiles}
-                  registeredPaths={store.registeredPaths}
+                  pagination={
+                    batchStatusData?.pagination || {
+                      page: 1,
+                      size: 10,
+                      total: 0,
+                      pages: 1,
+                    }
+                  }
+                  onPageChange={(p) => {
+                    setPage(p);
+                  }}
                   selectedFiles={store.selectedFiles}
                   isLoading={isFilesLoading && store.isProcessing}
                   onRemove={store.removePendingFile}
                   onRetry={() => {}}
                   dropFiles={async (e) => {
                     if (e.dataTransfer.items) {
-                      const files = await getFilesFromDataTransfer(e.dataTransfer.items);
+                      const files = await getFilesFromDataTransfer(
+                        e.dataTransfer.items,
+                      );
                       if (files.length > 0) handleAddFiles(files);
                     } else if (e.dataTransfer.files) {
                       handleAddFiles(e.dataTransfer.files);
@@ -287,7 +393,9 @@ const Index = () => {
                 <LogsPanel
                   logs={store.logs}
                   autoscroll={store.logsAutoscroll}
-                  onToggleAutoscroll={() => store.setLogsAutoscroll(!store.logsAutoscroll)}
+                  onToggleAutoscroll={() =>
+                    store.setLogsAutoscroll(!store.logsAutoscroll)
+                  }
                 />
               </>
             )}
@@ -295,7 +403,14 @@ const Index = () => {
             {store.currentView === "runs" && (
               <RunsPanel
                 runs={runsData?.items || []}
-                pagination={runsData?.pagination || { page: 1, size: 10, total: 0, pages: 1 }}
+                pagination={
+                  runsData?.pagination || {
+                    page: 1,
+                    size: 10,
+                    total: 0,
+                    pages: 1,
+                  }
+                }
                 isLoading={isRunsLoading}
                 onPageChange={setRunsPage}
                 onViewResults={(runId) => {
@@ -318,7 +433,14 @@ const Index = () => {
             {store.currentView === "results" && (
               <ResultsPanel
                 results={resultsData?.items || []}
-                pagination={resultsData?.pagination || { page: 1, size: 10, total: 0, pages: 1 }}
+                pagination={
+                  resultsData?.pagination || {
+                    page: 1,
+                    size: 10,
+                    total: 0,
+                    pages: 1,
+                  }
+                }
                 runFilter={store.resultsRunFilter}
                 isLoading={isResultsLoading}
                 onRunFilterChange={store.setResultsRunFilter}
@@ -339,8 +461,19 @@ const Index = () => {
             {store.currentView === "search" && (
               <SearchPanel
                 query={store.searchQuery}
-                results={store.searchQuery.trim() ? (searchData?.items || []) : []}
-                pagination={store.searchQuery.trim() ? (searchData?.pagination || { page: 1, size: 10, total: 0, pages: 1 }) : { page: 1, size: 10, total: 0, pages: 1 }}
+                results={
+                  store.searchQuery.trim() ? searchData?.items || [] : []
+                }
+                pagination={
+                  store.searchQuery.trim()
+                    ? searchData?.pagination || {
+                        page: 1,
+                        size: 10,
+                        total: 0,
+                        pages: 1,
+                      }
+                    : { page: 1, size: 10, total: 0, pages: 1 }
+                }
                 isLoading={isSearchLoading}
                 onSearch={(q, p) => {
                   if (q !== store.searchQuery) store.setSearchQuery(q);
@@ -364,7 +497,8 @@ const Index = () => {
                 <h2 className="font-semibold mb-4 text-lg">System Settings</h2>
                 <div className="space-y-4">
                   <p className="text-sm text-muted-foreground">
-                    Configure the PDF extraction pipeline settings in the panel on the right.
+                    Configure the PDF extraction pipeline settings in the panel
+                    on the right.
                   </p>
                 </div>
               </div>
@@ -384,4 +518,3 @@ const Index = () => {
 };
 
 export default Index;
-

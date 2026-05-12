@@ -102,6 +102,13 @@ export interface PendingFile {
   relPath?: string;
   refId?: string;
 }
+export interface FilesListItem {
+  content_hash: string;
+  is_processed: boolean;
+  name: string;
+  rel_path: string;
+  size_bytes: number;
+}
 
 export interface SSEStateUpdateEvent {
   type: 'state_update';

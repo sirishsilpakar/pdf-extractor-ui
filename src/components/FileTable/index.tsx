@@ -16,7 +16,6 @@ import { FileTableRow } from "./FileTableRow";
 interface FileTableProps {
   files: PDFFile[];
   pendingFiles: PendingFile[];
-  registeredPaths?: { id: string; path: string; pdfCount: number }[];
   selectedFiles: Set<string>;
   onRemove: (id: string) => void;
   onRetry: (id: string) => void;
@@ -29,7 +28,6 @@ interface FileTableProps {
 export function FileTable({
   files,
   pendingFiles,
-  registeredPaths = [],
   selectedFiles,
   onRemove,
   onRetry,
@@ -39,11 +37,9 @@ export function FileTable({
   isLoading,
 }: FileTableProps & { isLoading?: boolean }) {
   const [sortConfig, setSortConfig] = useState<{ key: "name" | "status"; direction: "asc" | "desc" } | null>(null);
-  const [localPage, setLocalPage] = useState(1);
   const pageSize = serverPagination?.size || 10;
 
-  const currentPage = serverPagination?.page || localPage;
-  const onPageChange = serverOnPageChange || setLocalPage;
+  const currentPage = serverPagination?.page;
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -66,11 +62,7 @@ export function FileTable({
     ...sortedFiles.map(f => ({ ...f, isPending: false }))
   ], [pendingFiles, sortedFiles]);
 
-  useEffect(() => {
-    onPageChange(1);
-  }, [allItems.length, onPageChange]);
-
-  if (!isLoading && files.length === 0 && pendingFiles.length === 0 && registeredPaths.length === 0) {
+  if (!isLoading && files.length === 0 && pendingFiles.length === 0) {
     return <FileTableEmpty handleDrop={handleDrop} />;
   }
 
@@ -155,7 +147,6 @@ export function FileTable({
         </Table>
       </div>
 
-      {totalPages > 1 && (
         <div className="flex items-center justify-between px-2">
           <p className="text-xs text-muted-foreground" aria-live="polite">
             Showing page {currentPage} of {totalPages} ({allItems.length} total)
@@ -164,7 +155,7 @@ export function FileTable({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => onPageChange(currentPage - 1)}
+              onClick={() => serverOnPageChange(currentPage - 1)}
               disabled={currentPage === 1}
               className="rounded-xl h-8 px-3 text-xs"
               aria-label="Previous page"
@@ -174,7 +165,7 @@ export function FileTable({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => onPageChange(currentPage + 1)}
+              onClick={() => serverOnPageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
               className="rounded-xl h-8 px-3 text-xs"
               aria-label="Next page"
@@ -183,7 +174,6 @@ export function FileTable({
             </Button>
           </div>
         </div>
-      )}
     </div>
   );
 }
