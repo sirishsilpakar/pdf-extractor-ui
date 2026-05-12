@@ -289,6 +289,7 @@ const Index = () => {
 
     // 3. Start Job
     startJob({
+      batch_ids: [batchId],
       file_ids: [...uploadedIds, ...store.registeredRefIds],
       selected_files:
         Object.keys(selectedFilesPayload).length > 0
@@ -301,6 +302,7 @@ const Index = () => {
     store.setPendingFiles([]);
     store.setRegisteredRefIds([]);
     store.setRegisteredPaths([]);
+    setBatchId("");
     store.addLog("Pipeline started successfully!", "success");
   };
 
