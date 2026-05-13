@@ -168,6 +168,9 @@ const Index = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ path }),
       });
+      
+      store.setCurrentView("dashboard");
+
       if (!res.ok) {
         const err = await res.json();
         store.addLog(
@@ -176,9 +179,14 @@ const Index = () => {
         );
         return;
       }
+     
       const data = await res.json();
       if (data.batch_id) {
         getBatchStatusStream();
+        store.setTotalFiles(0);
+        store.setCompletedFiles(0);
+        store.setOverallProgress(0);
+        store.setSkipProcessedFiles(false);
       }
     } catch (e) {
       store.addLog(`Failed to register path: ${e}`, "error");
@@ -363,6 +371,7 @@ const Index = () => {
                   totalFiles={store.totalFiles}
                   completedFiles={store.completedFiles}
                   processingFile={store.processingFile}
+                  pendingFiles={store.pendingFiles.length}
                   isProcessing={store.isProcessing}
                   onCancel={() => {
                     cancelJob();
