@@ -74,6 +74,10 @@ interface SSEState {
   setProcessingFile: (val: string) => void;
   currentRunId: string | null;
   setCurrentRunId: (val: string | null) => void;
+
+  /** True when the user chose to skip already processed files for the current job. */
+  skipProcessedFiles: boolean;
+  setSkipProcessedFiles: (val: boolean) => void;
 }
 
 type AppState = UIState & SelectionState & SettingsState & LogState & PendingFilesState & ReprocessState & SSEState;
@@ -161,4 +165,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   setProcessingFile: (val) => set({ processingFile: val }),
   currentRunId: null,
   setCurrentRunId: (val) => set({ currentRunId: val }),
+  skipProcessedFiles: false,
+  setSkipProcessedFiles: (val) => set({ skipProcessedFiles: val }),
 }));

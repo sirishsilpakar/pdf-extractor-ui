@@ -56,6 +56,7 @@ const Index = () => {
     filesPage,
     10,
     store.isProcessing,
+    store.skipProcessedFiles
   );
   const { data: runsData, isPending: isRunsLoading } = useRuns(runsPage, 10);
   const {
@@ -74,10 +75,13 @@ const Index = () => {
     isPending: isBatchStatusPending,
     error: batchStatusError,
   } = useQuery({
-    queryKey: ["batchStatus", batchId, page, size],
+    queryKey: ["batchStatus", batchId, page, size, store.skipProcessedFiles],
     enabled: !!batchId,
     queryFn: async () => {
-      const url = `/batches/${batchId}/files?page=${page}&size=${size}`;
+      // Forward the skip decision so the endpoint returns only the files
+      // the pipeline will actually process, giving the correct total count
+      const skipParam = store.skipProcessedFiles ? "&skip_processed=true" : "";
+      const url = `/batches/${batchId}/files?page=${page}&size=${size}${skipParam}`;
       const data = await fetcher<{
         items: FilesListItem[];
         page: number;
@@ -287,6 +291,10 @@ const Index = () => {
       }
     }
 
+    // Record the skip decision so the query can filter
+    // the file list to only the files actually queued for processing
+    store.setSkipProcessedFiles(skipDuplicates);
+
     // 3. Start Job
     startJob({
       file_ids: [...uploadedIds, ...store.registeredRefIds],
@@ -321,6 +329,7 @@ const Index = () => {
         }}
         onCancel={() => {
           store.setShowReprocessModal(false);
+          store.setSkipProcessedFiles(false);
         }}
       />
 
@@ -355,7 +364,10 @@ const Index = () => {
                   completedFiles={store.completedFiles}
                   processingFile={store.processingFile}
                   isProcessing={store.isProcessing}
-                  onCancel={() => cancelJob()}
+                  onCancel={() => {
+                    cancelJob();
+                    store.setSkipProcessedFiles(false);
+                  }}
                   onStart={() => handleStartProcessing()}
                   eventErr={false}
                 />
