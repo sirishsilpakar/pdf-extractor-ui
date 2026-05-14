@@ -112,7 +112,7 @@ export interface FilesListItem {
 
 export interface SSEStateUpdateEvent {
   type: 'state_update';
-  status: 'idle' | 'running' | 'completed' | 'failed' | 'cancelled';
+  status: 'idle' | 'running' | 'completed' | 'failed' | 'cancelled' | 'done';
   done: number;
   total: number;
   progress_pct: number;

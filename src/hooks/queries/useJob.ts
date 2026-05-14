@@ -9,11 +9,23 @@ export function useJobStatus() {
   });
 }
 
-export function useJobFiles(page: number, size: number, enabled: boolean) {
+export function useJobFiles(
+  page: number,
+  size: number,
+  enabled: boolean,
+  skipProcessedFiles: boolean,
+) {
   return useQuery({
     queryKey: ["job-files", page, size],
     queryFn: async () => {
-      const data = await fetcher<{ items: Record<string, unknown>[]; page: number; size: number; total: number; pages: number }>(`/job/files?page=${page}&size=${size}`);
+      const skipParam = skipProcessedFiles ? "&skip_processed=true" : ""
+      const data = await fetcher<{
+        items: Record<string, unknown>[]
+        page: number
+        size: number
+        total: number
+        pages: number
+      }>(`/job/files?page=${page}&size=${size}${skipParam}`)
       const items: PDFFile[] = data.items.map((f: Record<string, unknown>) => ({
         id: f.id || f.name,
         name: f.name,

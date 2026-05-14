@@ -21,6 +21,7 @@ interface Props {
   totalFiles: number;
   completedFiles: number;
   processingFile?: string;
+  pendingFilesCount: number;
   isProcessing: boolean;
   eventErr: boolean;
   onCancel: () => void;
@@ -32,6 +33,7 @@ export function ProcessingDashboard({
   totalFiles,
   completedFiles,
   processingFile,
+  pendingFilesCount = 0,
   isProcessing,
   eventErr,
   onCancel,
@@ -52,6 +54,12 @@ export function ProcessingDashboard({
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [isProcessing]);
+
+  useEffect(() => {
+    if (pendingFilesCount > 0) {
+      setT(0);
+    }
+  }, [pendingFilesCount]);
 
   useEffect(() => {
     if (eventErr) {
@@ -77,7 +85,7 @@ export function ProcessingDashboard({
               size="sm"
               className="rounded-xl gap-1 text-xs"
               onClick={onStart}
-              disabled={totalFiles === 0}
+              disabled={pendingFilesCount === 0}
               aria-label="Start Processing"
             >
               <Play className="h-3 w-3" aria-hidden="true" /> Start

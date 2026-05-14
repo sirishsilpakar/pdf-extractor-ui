@@ -57,6 +57,7 @@ const Index = () => {
     filesPage,
     10,
     store.isProcessing,
+    store.skipProcessedFiles
   );
   const { data: runsData, isPending: isRunsLoading } = useRuns(runsPage, 10);
   const {
@@ -75,10 +76,13 @@ const Index = () => {
     isPending: isBatchStatusPending,
     error: batchStatusError,
   } = useQuery({
-    queryKey: ["batchStatus", batchId, page, size],
+    queryKey: ["batchStatus", batchId, page, size, store.skipProcessedFiles],
     enabled: !!batchId,
     queryFn: async () => {
-      const url = `/batches/${batchId}/files?page=${page}&size=${size}`;
+      // Forward the skip decision so the endpoint returns only the files
+      // the pipeline will actually process, giving the correct total count
+      const skipParam = store.skipProcessedFiles ? "&skip_processed=true" : "";
+      const url = `/batches/${batchId}/files?page=${page}&size=${size}${skipParam}`;
       const data = await fetcher<{
         items: FilesListItem[];
         page: number;
@@ -165,6 +169,9 @@ const Index = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ path }),
       });
+      
+      store.setCurrentView("dashboard");
+
       if (!res.ok) {
         const err = await res.json();
         store.addLog(
@@ -173,9 +180,14 @@ const Index = () => {
         );
         return;
       }
+     
       const data = await res.json();
       if (data.batch_id) {
         getBatchStatusStream();
+        store.setTotalFiles(0);
+        store.setCompletedFiles(0);
+        store.setOverallProgress(0);
+        store.setSkipProcessedFiles(false);
       }
     } catch (e) {
       store.addLog(`Failed to register path: ${e}`, "error");
@@ -288,6 +300,10 @@ const Index = () => {
       }
     }
 
+    // Record the skip decision so the query can filter
+    // the file list to only the files actually queued for processing
+    store.setSkipProcessedFiles(skipDuplicates);
+
     // 3. Start Job
     startJob(
       {
@@ -335,6 +351,7 @@ const Index = () => {
         }}
         onCancel={() => {
           store.setShowReprocessModal(false);
+          store.setSkipProcessedFiles(false);
         }}
       />
 
@@ -368,8 +385,12 @@ const Index = () => {
                   totalFiles={store.totalFiles}
                   completedFiles={store.completedFiles}
                   processingFile={store.processingFile}
+                  pendingFilesCount={store.pendingFiles.length}
                   isProcessing={store.isProcessing}
-                  onCancel={() => cancelJob()}
+                  onCancel={() => {
+                    cancelJob();
+                    store.setSkipProcessedFiles(false);
+                  }}
                   onStart={() => handleStartProcessing()}
                   eventErr={false}
                 />
