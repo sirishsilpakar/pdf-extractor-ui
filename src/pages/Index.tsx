@@ -371,7 +371,7 @@ const Index = () => {
                   totalFiles={store.totalFiles}
                   completedFiles={store.completedFiles}
                   processingFile={store.processingFile}
-                  pendingFiles={store.pendingFiles.length}
+                  pendingFilesCount={store.pendingFiles.length}
                   isProcessing={store.isProcessing}
                   onCancel={() => {
                     cancelJob();
