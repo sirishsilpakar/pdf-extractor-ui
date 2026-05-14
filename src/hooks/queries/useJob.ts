@@ -55,7 +55,7 @@ export function useStartJob() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (payload: {
-      batch_ids: string[]
+      batch_id: string
       file_ids: string[]
       selected_files: Record<string, string[]> | null
       force: boolean
