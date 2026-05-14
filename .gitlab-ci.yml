@@ -2,6 +2,20 @@ stages:
   - build
   - release
 
+build-mac:
+  stage: build
+  tags:
+    - macos
+  rules:
+    - if: $CI_COMMIT_TAG
+  script:
+    - npm ci
+    - npm run electron:build:mac
+  artifacts:
+    paths:
+      - release/
+    expire_in: 1 week
+
 build-win:
   stage: build 
   image: electronuserland/builder:wine
