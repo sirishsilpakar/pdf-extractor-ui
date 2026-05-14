@@ -18,6 +18,8 @@ build-mac:
 
 build-win:
   stage: build 
+  tags:
+    - docker
   image: electronuserland/builder:wine
   rules:
     - if: $CI_COMMIT_TAG
@@ -31,6 +33,8 @@ build-win:
 
 build-linux:
   stage: build
+  tags:
+    - docker
   image: electronuserland/builder:latest
   rules:
     - if: $CI_COMMIT_TAG
@@ -48,6 +52,7 @@ release:
   needs:
     - build-win
     - build-linux
+    - build-mac
   rules:
     - if: $CI_COMMIT_TAG
   script:
@@ -62,3 +67,5 @@ release:
           url: "$CI_PROJECT_URL/-/jobs/artifacts/$CI_COMMIT_TAG/download?job=build-win"
         - name: "Linux"
           url: "$CI_PROJECT_URL/-/jobs/artifacts/$CI_COMMIT_TAG/download?job=build-linux"
+        - name: "macOS"
+          url: "$CI_PROJECT_URL/-/jobs/artifacts/$CI_COMMIT_TAG/download?job=build-mac"
