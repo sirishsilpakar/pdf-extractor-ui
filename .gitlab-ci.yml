@@ -1,26 +1,18 @@
+default:
+  tags:
+    - docker
+
 stages:
   - build
   - release
 
-build-mac:
-  stage: build
-  rules:
-    - if: $CI_COMMIT_TAG && $CI_COMMIT_BRANCH == "main"
-  script:
-    - npm ci
-    - npm run electron:build:mac
-  artifacts:
-    paths:
-      - release/
-    expire_in: 1 week
-
 build-win:
-  stage: build
+  stage: build 
   image: electronuserland/builder:wine
   rules:
-    - if: $CI_COMMIT_TAG && $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_TAG
   script:
-    - npm ci
+    - npm ci --cache .npm --prefer-offline
     - npm run electron:build:win
   artifacts:
     paths:
@@ -31,9 +23,9 @@ build-linux:
   stage: build
   image: electronuserland/builder:latest
   rules:
-    - if: $CI_COMMIT_TAG && $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_TAG
   script:
-    - npm ci
+    - npm ci --cache .npm --prefer-offline
     - npm run electron:build:linux
   artifacts:
     paths:
@@ -43,8 +35,11 @@ build-linux:
 release:
   stage: release
   image: registry.gitlab.com/gitlab-org/release-cli:latest
+  needs:
+    - build-win
+    - build-linux
   rules:
-    - if: $CI_COMMIT_TAG && $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_TAG
   script:
     - echo "Creating release $CI_COMMIT_TAG"
   release:
@@ -53,8 +48,6 @@ release:
     description: "Release $CI_COMMIT_TAG"
     assets:
       links:
-        - name: "Mac"
-          url: "$CI_PROJECT_URL/-/jobs/artifacts/$CI_COMMIT_TAG/download?job=build-mac"
         - name: "Windows"
           url: "$CI_PROJECT_URL/-/jobs/artifacts/$CI_COMMIT_TAG/download?job=build-win"
         - name: "Linux"
