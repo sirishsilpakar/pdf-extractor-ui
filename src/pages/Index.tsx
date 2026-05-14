@@ -10,6 +10,7 @@ import { RunsPanel } from "@/components/RunsPanel";
 import { ResultsPanel } from "@/components/ResultsPanel";
 import { ReprocessModal } from "@/components/ReprocessModal";
 import { useAppStore } from "@/store/useAppStore";
+import { toast } from "@/components/ui/sonner";
 import { getFilesFromDataTransfer } from "@/lib/fileDrop";
 import { hashFile } from "@/lib/hashing";
 import { useSSE } from "@/hooks/useSSE";
@@ -288,20 +289,33 @@ const Index = () => {
     }
 
     // 3. Start Job
-    startJob({
-      file_ids: [...uploadedIds, ...store.registeredRefIds],
-      selected_files:
-        Object.keys(selectedFilesPayload).length > 0
-          ? selectedFilesPayload
-          : null,
-      force,
-    });
-
-    // Clear pending files to UI transition into dashboard
-    store.setPendingFiles([]);
-    store.setRegisteredRefIds([]);
-    store.setRegisteredPaths([]);
-    store.addLog("Pipeline started successfully!", "success");
+    startJob(
+      {
+        batch_id: batchId,
+        file_ids: [...uploadedIds, ...store.registeredRefIds],
+        selected_files:
+          Object.keys(selectedFilesPayload).length > 0
+            ? selectedFilesPayload
+            : null,
+        force,
+      },
+      {
+        onSuccess: () => {
+          // Clear pending files to UI transition into dashboard
+          store.setPendingFiles([]);
+          store.setRegisteredRefIds([]);
+          store.setRegisteredPaths([]);
+          setBatchId("");
+          store.addLog("Pipeline started successfully!", "success");
+        },
+        onError: (error: any) => {
+          store.addLog(`Failed to start job: ${error.message}`, "error");
+          toast.error("Failed to start job", {
+            description: error.message,
+          });
+        },
+      }
+    );
   };
 
   return (

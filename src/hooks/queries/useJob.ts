@@ -54,7 +54,12 @@ export function useCancelJob() {
 export function useStartJob() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: { file_ids: string[]; selected_files: Record<string, string[]> | null; force: boolean }) =>
+    mutationFn: (payload: {
+      batch_id: string
+      file_ids: string[]
+      selected_files: Record<string, string[]> | null
+      force: boolean
+    }) =>
       fetcher("/job/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
