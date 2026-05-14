@@ -4,6 +4,22 @@
   "version": "1.0.0",
   "type": "module",
   "main": "electron/main.js",
+  "description": "PDF extractor desktop application",
+  "homepage": "https://gitlab.uni-marburg.de/gurung/pdf-extractor-ui",
+  "author": {
+    "name": "Sanjay Gurung",
+    "email": "gurung@students.uni-marburg.de"
+  },
+  "contributors": [
+    {
+      "name": "Sirish Silpakar",
+      "email": "silpakar@students.uni-marburg.de"
+    },
+    {
+      "name": "Sapna Luthra",
+      "email": "luthra@students.uni-marburg.de"
+    }
+  ],
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -65,9 +81,9 @@
     "linux": {
       "target": [
         "AppImage",
-        "deb",
-        "rpm"
+        "deb"
       ],
+      "maintainer": "PDF Extractor Team <gurung@students.uni-marburg.de>",
       "category": "Utility"
     }
   },
