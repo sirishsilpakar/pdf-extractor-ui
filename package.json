@@ -28,16 +28,25 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "prepackage": "node scripts/download_tessdata.js",
     "electron": "electron .",
     "electron:dev": "cross-env VITE_DEV_SERVER_URL=http://localhost:8081 electron .",
     "electron:build": "vite build && electron-builder",
     "electron:build:mac": "vite build && electron-builder --mac",
     "electron:build:win": "vite build && electron-builder --win",
-    "electron:build:linux": "vite build && electron-builder --linux"
+    "electron:build:linux": "vite build && electron-builder --linux",
+    "electron:dev:fe": "cross-env VITE_DEV_SERVER_URL=http://localhost:8081 START_BACKEND=false electron .",
+    "dev:all": "concurrently -k -p \"[{name}]\" -n \"Vite,Electron\" -c \"blue.bold,yellow.bold\" \"vite\" \"wait-on http://localhost:8081 && npm run electron:dev\"",
+    "dev:fe": "concurrently -k -p \"[{name}]\" -n \"Vite,Electron\" -c \"blue.bold,yellow.bold\" \"vite\" \"wait-on http://localhost:8081 && npm run electron:dev:fe\"",
+    "package:mac": "node scripts/fix_mac_binaries.js && chmod -R +x bin/mac/ && vite build && electron-builder --mac",
+    "package:win": "vite build && electron-builder --win",
+    "package:linux": "vite build && electron-builder --linux",
+    "download:tesseract": "node scripts/download_tesseract.js",
+    "build:unified": "node scripts/build_unified.js"
   },
   "build": {
-    "appId": "PDFTextract",
-    "productName": "PDF Text extractor tool",
+    "appId": "com.pdftextract.app",
+    "productName": "PDF Extractor tool",
     "directories": {
       "buildResources": "assets",
       "output": "release"
@@ -46,6 +55,19 @@
       "dist/**/*",
       "electron/**/*"
     ],
+    "extraResources": [
+          {
+            "from": "bin/${os}",
+            "to": "bin",
+            "filter": [
+              "**/*"
+            ]
+          },
+          {
+            "from": "bin/tessdata",
+            "to": "bin/tessdata"
+          }
+        ],  
     "mac": {
       "category": "public.app-category.productivity",
       "target": [
@@ -152,6 +174,7 @@
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react-swc": "^3.11.0",
     "autoprefixer": "^10.4.21",
+    "concurrently": "^9.2.1",
     "cross-env": "^10.1.0",
     "electron": "^42.0.1",
     "electron-builder": "^26.8.1",
@@ -166,6 +189,7 @@
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.38.0",
     "vite": "^7.3.3",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "wait-on": "^9.0.10"
   }
 }
