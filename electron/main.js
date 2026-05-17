@@ -1,7 +1,15 @@
 import { app, BrowserWindow } from "electron";
+
+// Prevent macOS from prompting for Keychain Access/Safe Storage for unsigned apps
+if (process.platform === "darwin") {
+  app.commandLine.appendSwitch("password-store", "basic")
+  app.commandLine.appendSwitch("use-mock-keychain")
+}
+
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
+import { spawn } from "child_process";
 import { ipcMain, dialog } from "electron";
 
 ipcMain.handle("open-file-dialog", async () => {
@@ -16,7 +24,7 @@ ipcMain.handle("open-folder-dialog", async () => {
   const result = await dialog.showOpenDialog({
     properties: ["openDirectory"],
   });
-  return result.filePaths[0];
+  return result.filePaths[0]
 });
 
 const __filename = fileURLToPath(import.meta.url);
@@ -41,4 +49,164 @@ function createWindow() {
   }
 }
 
-app.whenReady().then(createWindow);
+let backendProcess = null
+
+function startBackend() {
+  const isDev = process.env.VITE_DEV_SERVER_URL !== undefined
+
+  // Base directory for extraction data
+  const baseDir = app.getPath("userData")
+
+  let backendPath
+  let tesseractPath
+  let tessdataPath
+
+  if (isDev) {
+    const osDir =
+      process.platform === "darwin" ? "mac" : process.platform === "win32" ? "win" : "linux"
+    const exeName =
+      process.platform === "win32" ? "pdf-extractor-backend.exe" : "pdf-extractor-backend"
+    backendPath = path.join(
+      __dirname,
+      "..",
+      "bin",
+      osDir,
+      "backend",
+      "pdf-extractor-backend",
+      exeName,
+    )
+    tesseractPath = path.join(
+      __dirname,
+      "..",
+      "bin",
+      osDir,
+      "tesseract",
+      process.platform === "win32" ? "tesseract.exe" : "tesseract",
+    )
+    tessdataPath = path.join(__dirname, "..", "bin", "tessdata")
+  } else {
+    const exeName =
+      process.platform === "win32" ? "pdf-extractor-backend.exe" : "pdf-extractor-backend"
+    backendPath = path.join(
+      process.resourcesPath,
+      "bin",
+      "backend",
+      "pdf-extractor-backend",
+      exeName,
+    )
+    tesseractPath = path.join(
+      process.resourcesPath,
+      "bin",
+      "tesseract",
+      process.platform === "win32" ? "tesseract.exe" : "tesseract",
+    )
+    tessdataPath = path.join(process.resourcesPath, "bin", "tessdata")
+  }
+
+  // Check if backend executable exists
+  if (!fs.existsSync(backendPath)) {
+    console.error("Backend executable not found at:", backendPath)
+    console.error("Make sure to build the Python backend and place it in the bin/ folder!")
+    return
+  }
+
+  // Fix macOS/Linux execution permissions if bundled
+  if (process.platform === "darwin" || process.platform === "linux") {
+    try {
+      fs.chmodSync(backendPath, 0o755)
+      console.log("Set execute permissions for backend.")
+    } catch (err) {
+      console.error("Failed to set execute permissions for backend:", err)
+    }
+    try {
+      if (fs.existsSync(tesseractPath)) {
+        fs.chmodSync(tesseractPath, 0o755)
+        console.log("Set execute permissions for tesseract.")
+      }
+    } catch (err) {
+      console.error("Failed to set execute permissions for tesseract:", err)
+    }
+  }
+
+  console.log("Starting backend...")
+  console.log("  Backend Path:", backendPath)
+  console.log("  Tesseract Path:", tesseractPath)
+  console.log("  Tessdata Path:", tessdataPath)
+  console.log("  User Data Dir:", baseDir)
+
+  if (!fs.existsSync(tesseractPath)) {
+    console.warn("  WARNING: Tesseract binary not found at expected path!")
+  }
+  if (!fs.existsSync(tessdataPath)) {
+    console.warn("  WARNING: Tessdata directory not found at expected path! OCR will likely fail.")
+  }
+
+  const env = {
+    ...process.env,
+    BASE_DIR: baseDir,
+    TESSERACT_CMD: tesseractPath,
+    TESSDATA_PREFIX: tessdataPath,
+    SERVER_PORT: "8080",
+    SERVE_UI: "false", // headless mode
+  }
+
+  // Add library paths for macOS and Linux to find bundled shared libraries
+  if (process.platform === "darwin") {
+    const tessDir = path.dirname(tesseractPath)
+    env.DYLD_LIBRARY_PATH = [tessDir, process.env.DYLD_LIBRARY_PATH].filter(Boolean).join(":")
+    console.log("  DYLD_LIBRARY_PATH:", env.DYLD_LIBRARY_PATH)
+  } else if (process.platform === "linux") {
+    const tessDir = path.dirname(tesseractPath)
+    env.LD_LIBRARY_PATH = [tessDir, process.env.LD_LIBRARY_PATH].filter(Boolean).join(":")
+    console.log("  LD_LIBRARY_PATH:", env.LD_LIBRARY_PATH)
+  }
+
+  backendProcess = spawn(backendPath, ["--no-ui"], {
+    cwd: path.dirname(backendPath),
+    env: env,
+  })
+
+  backendProcess.on("error", (err) => {
+    const msg = `Failed to start backend: ${err.message}\nPath: ${backendPath}`
+    console.error(msg)
+    dialog.showErrorBox("Backend Error", msg)
+  })
+
+  backendProcess.on("exit", (code, signal) => {
+    console.log(`[Backend] Process exited with code ${code} and signal ${signal}`)
+    if (code !== 0 && code !== null) {
+      dialog.showErrorBox(
+        "Backend Process Exited",
+        `The backend process stopped unexpectedly (Code: ${code}).\nCheck if another app is using port 8080.`,
+      )
+    }
+    backendProcess = null
+  })
+
+  backendProcess.stdout.on("data", (data) => {
+    console.log(`[Backend] ${data.toString().trim()}`)
+  })
+
+  backendProcess.stderr.on("data", (data) => {
+    console.error(`[Backend ERR] ${data.toString().trim()}`)
+  })
+}
+
+app.on("will-quit", () => {
+  if (backendProcess) {
+    backendProcess.kill()
+  }
+})
+
+app.whenReady().then(() => {
+  const shouldStartBackend =
+    process.env.START_BACKEND !== "false" &&
+    !process.argv.includes("--no-backend") &&
+    !process.argv.includes("--fe-only")
+  if (shouldStartBackend) {
+    startBackend()
+  } else {
+    console.log("Backend start skipped (FE-only mode enabled).")
+  }
+  createWindow()
+})
