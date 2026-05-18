@@ -11,11 +11,11 @@ const __dirname = path.dirname(__filename);
 // Linux: statically compiled build from mugwort-solutions/tesseract-static GitHub releases
 const TESSERACT_LINUX_URL =
   process.env.TESSERACT_LINUX_URL ||
-  "https://github.com/nicowillis/tesseract-static/releases/download/5.3.3/tesseract-linux-x86_64.tar.gz";
+  "https://github.com/DanielMYT/tesseract-static/releases/download/tesseract-5.5.2/tesseract.x86_64";
 // Windows: Official UB Mannheim portable build (64-bit, includes tesseract.exe + DLLs)
 const TESSERACT_WIN_URL =
   process.env.TESSERACT_WIN_URL ||
-  "https://github.com/UB-Mannheim/tesseract/releases/download/v5.3.3.20231005/tesseract-ocr-w64-setup-5.3.3.20231005.exe";
+  "https://github.com/UB-Mannheim/tesseract/releases/download/v5.4.0.20240606/tesseract-ocr-w64-setup-5.4.0.20240606.exe";
 
 // Parse command line arguments
 const args = process.argv.slice(2);
