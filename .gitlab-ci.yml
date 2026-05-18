@@ -46,73 +46,74 @@ workflow:
     - if: $CI_COMMIT_BRANCH == "main"
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
 
-# ===========================================================================
-# 1. Build Stage — Linux + Windows (cross-compiled, single Linux Docker job)
-# ===========================================================================
-build:linux+windows:
-  stage: build
-  image: electronuserland/builder:wine
+build-win:
+  stage: build 
   tags:
-    - linux
+    - windows
+  cache:
+    key: "npm-win-$CI_COMMIT_REF_SLUG"
+    paths:
+      - node_modules/
+    policy: pull-push
+  before_script:
+    - node --version
+    - npm --version
+    - npm ci --cache .npm --prefer-offline
+  script:
+    - echo "==> Fetching pre-built Windows Python backend from registry..."
+    - |
+      $BACKEND_VERSION = if ($env:CI_COMMIT_TAG) { $env:CI_COMMIT_TAG } else { "dev-$env:CI_COMMIT_SHORT_SHA" }
+      $WIN_BACKEND_URL = "${env:CI_API_V4_URL}/projects/${env:BACKEND_PROJECT_ID}/packages/generic/pdf-extractor-backend/${BACKEND_VERSION}/pdf-extractor-backend-windows.zip"
+      
+      echo "DEBUG: Target Windows Registry URL is -> $WIN_BACKEND_URL"
+      
+      # PowerShell native curl alternative download blocks
+      Invoke-WebRequest -Uri $WIN_BACKEND_URL -Headers @{"JOB-TOKEN"="$env:CI_JOB_TOKEN"} -OutFile "$env:TEMP\backend-windows.zip"
+      New-Item -ItemType Directory -Force -Path "bin\win\backend"
+      Expand-Archive -Path "$env:TEMP\backend-windows.zip" -DestinationPath "bin\win\backend" -Force
+
+    - node scripts/download_tesseract.js --platform=win32
+    - node scripts/download_tessdata.js
+    - npm run electron:build:win
+  artifacts:
+    paths:
+      - release/
+    expire_in: 1 week
+
+# ===========================================================================
+# 3. Build Stage — Linux (Using 'docker' tag)
+# ===========================================================================
+build-linux:
+  stage: build
+  tags:
+    - docker
+  image: electronuserland/builder:latest
   cache:
     key: "npm-linux-$CI_COMMIT_REF_SLUG"
     paths:
       - node_modules/
     policy: pull-push
   before_script:
-    # wine64 is needed for electron-builder's Windows cross-compilation
-    - npm ci --prefer-offline
+    - npm ci --cache .npm --prefer-offline
   script:
-    # ── Linux backend ────────────────────────────────────────────────────────
-    - echo "==> [1/7] Compiling Linux Python backend from source..."
-    - node scripts/build_unified.js
-
-    - echo "==> [2/7] Downloading Linux Tesseract..."
-    - node scripts/download_tesseract.js --platform=linux
-
-    # ── Windows backend (pre-built .exe from Package Registry) ───────────────
-    - echo "==> [3/7] Fetching Windows Python backend from Backend Package Registry..."
+    - echo "==> Fetching pre-built Linux Python backend from registry..."
     - |
       BACKEND_VERSION="${CI_COMMIT_TAG:-dev-${CI_COMMIT_SHORT_SHA}}"
-      WIN_BACKEND_URL="${CI_API_V4_URL}/projects/${BACKEND_PROJECT_ID}/packages/generic/pdf-extractor-backend/${BACKEND_VERSION}/pdf-extractor-backend-windows.zip"
-      HTTP_CODE=$(curl --silent --output /dev/null --write-out "%{http_code}" \
-                       --header "JOB-TOKEN: $CI_JOB_TOKEN" "$WIN_BACKEND_URL")
-      if [ "$HTTP_CODE" = "200" ]; then
-        echo "Found pre-built Windows backend v${BACKEND_VERSION} — downloading..."
-        curl --fail --silent --show-error \
-             --header "JOB-TOKEN: $CI_JOB_TOKEN" \
-             --output /tmp/pdf-extractor-backend-windows.zip \
-             "$WIN_BACKEND_URL"
-        mkdir -p bin/win/backend
-        unzip -q /tmp/pdf-extractor-backend-windows.zip -d bin/win/backend/
-        echo "✓ Windows backend ready."
-      else
-        echo "ERROR: Windows backend not found in Package Registry (HTTP $HTTP_CODE)."
-        echo "Ensure you built the backend project with version tag: ${BACKEND_VERSION}"
-        exit 1
-      fi
+      LINUX_BACKEND_URL="${CI_API_V4_URL}/projects/${BACKEND_PROJECT_ID}/packages/generic/pdf-extractor-backend/${BACKEND_VERSION}/pdf-extractor-backend-linux.zip"
+      
+      echo "DEBUG: Target Linux Registry URL is -> ${LINUX_BACKEND_URL}"
+      
+      curl --fail --silent --show-error --header "JOB-TOKEN: $CI_JOB_TOKEN" --output /tmp/pdf-extractor-backend-linux.zip "$LINUX_BACKEND_URL"
+      mkdir -p bin/linux/backend
+      unzip -q /tmp/pdf-extractor-backend-linux.zip -d bin/linux/backend/
 
-    - echo "==> [4/7] Downloading Windows Tesseract..."
-    - node scripts/download_tesseract.js --platform=win32
-
-    - echo "==> [5/7] Downloading Tessdata language models..."
+    - node scripts/download_tesseract.js --platform=linux
     - node scripts/download_tessdata.js
-
-    # ── Package both targets ─────────────────────────────────────────────────
-    - echo "==> [6/7] Building Vite frontend..."
-    - npm run build
-
-    - echo "==> [7/7] Packaging Electron for Linux + Windows..."
-    - npx electron-builder --linux --win --publish=never
+    - npm run electron:build:linux
   artifacts:
-    name: "pdf-extractor-linux-windows-$CI_COMMIT_REF_SLUG"
-    expire_in: 30 days
     paths:
-      - release/*.AppImage
-      - release/*.deb
-      - release/*.exe
-      - release/*.zip
-
+      - release/
+    expire_in: 1 week
 # ===========================================================================
 # 2. Build Stage — macOS (requires a real macOS runner)
 #
@@ -134,12 +135,14 @@ release:
   stage: release
   image: registry.gitlab.com/gitlab-org/release-cli:latest
   tags:
-    - linux
+    - docker
+  needs:
+    - job: build-win
+      artifacts: true
+    - job: build-linux
+      artifacts: true
   rules:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
-  needs:
-    - job: build:linux+windows
-      artifacts: true
   script:
     - echo "==> Uploading all release artifacts to Package Registry..."
     - |
