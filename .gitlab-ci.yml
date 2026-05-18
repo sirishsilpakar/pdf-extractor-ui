@@ -37,6 +37,9 @@ stages:
   - build
   - release
 
+variables:
+  BACKEND_PROJECT_ID: "3846"
+
 workflow:
   rules:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
@@ -74,10 +77,10 @@ build:linux+windows:
     - node scripts/download_tesseract.js --platform=linux
 
     # ── Windows backend (pre-built .exe from Package Registry) ───────────────
-    - echo "==> [3/7] Fetching Windows Python backend from Package Registry..."
+    - echo "==> [3/7] Fetching Windows Python backend from Backend Package Registry..."
     - |
       BACKEND_VERSION="${CI_COMMIT_TAG:-dev-${CI_COMMIT_SHORT_SHA}}"
-      WIN_BACKEND_URL="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/pdf-extractor-backend/${BACKEND_VERSION}/pdf-extractor-backend-windows.zip"
+      WIN_BACKEND_URL="${CI_API_V4_URL}/projects/${BACKEND_PROJECT_ID}/packages/generic/pdf-extractor-backend/${BACKEND_VERSION}/pdf-extractor-backend-windows.zip"
       HTTP_CODE=$(curl --silent --output /dev/null --write-out "%{http_code}" \
                        --header "JOB-TOKEN: $CI_JOB_TOKEN" "$WIN_BACKEND_URL")
       if [ "$HTTP_CODE" = "200" ]; then
@@ -91,7 +94,7 @@ build:linux+windows:
         echo "✓ Windows backend ready."
       else
         echo "ERROR: Windows backend not found in Package Registry (HTTP $HTTP_CODE)."
-        echo "Push a semver tag to the pdf-extractor backend repo first to build it."
+        echo "Ensure you built the backend project with version tag: ${BACKEND_VERSION}"
         exit 1
       fi
 
@@ -142,17 +145,31 @@ build:mac:
       - node_modules/
     policy: pull-push
   before_script:
-    # Verify required tools are present on the macOS runner
+    # Append common Homebrew and system binary paths so the runner can locate Node/NPM
+    - export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+    
+    # Verify or dynamically resolve Node dependencies fallback
+    - |
+      if ! command -v node &> /dev/null; then
+        echo "Node.js not detected in PATH. Attempting to install via Homebrew..."
+        if ! command -v brew &> /dev/null; then
+          echo "ERROR: Homebrew is missing from the macOS runner host. Cannot proceed."
+          exit 1
+        fi
+        HOMEBREW_NO_AUTO_UPDATE=1 brew install node@20
+        export PATH="$(brew --prefix node@20)/bin:$PATH"
+      fi
     - node --version
     - npm --version
-    - brew --version
     - npm ci --prefer-offline
   script:
+    - export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+    
     # ── macOS backend (pre-built from Package Registry) ──────────────────────
-    - echo "==> [1/6] Fetching macOS Python backend from Package Registry..."
+    - echo "==> [1/6] Fetching macOS Python backend from Backend Package Registry..."
     - |
       BACKEND_VERSION="${CI_COMMIT_TAG:-dev-${CI_COMMIT_SHORT_SHA}}"
-      MAC_BACKEND_URL="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/pdf-extractor-backend/${BACKEND_VERSION}/pdf-extractor-backend-mac.tar.gz"
+      MAC_BACKEND_URL="${CI_API_V4_URL}/projects/${BACKEND_PROJECT_ID}/packages/generic/pdf-extractor-backend/${BACKEND_VERSION}/pdf-extractor-backend-mac.tar.gz"
       HTTP_CODE=$(curl --silent --output /dev/null --write-out "%{http_code}" \
                        --header "JOB-TOKEN: $CI_JOB_TOKEN" "$MAC_BACKEND_URL")
       if [ "$HTTP_CODE" = "200" ]; then
@@ -166,13 +183,13 @@ build:mac:
         echo "✓ macOS backend ready."
       else
         echo "ERROR: macOS backend not found in Package Registry (HTTP $HTTP_CODE)."
-        echo "Push a semver tag to the pdf-extractor backend repo first to build it."
+        echo "Ensure you built the backend project with version tag: ${BACKEND_VERSION}"
         exit 1
       fi
 
     # ── macOS Tesseract (install via Homebrew, copy & patch dylibs) ──────────
-    - echo "==> [2/6] Installing Tesseract via Homebrew..."
-    - brew install tesseract
+    - echo "==> [2/6] Installing Tesseract via Homebrew safely..."
+    - HOMEBREW_NO_AUTO_UPDATE=1 brew install tesseract || true
     - |
       TESS_PREFIX=$(brew --prefix tesseract)
       DEST=bin/mac/tesseract
@@ -180,11 +197,9 @@ build:mac:
       echo "Copying tesseract binary from $TESS_PREFIX/bin/tesseract..."
       cp "$TESS_PREFIX/bin/tesseract" "$DEST/tesseract"
       echo "Copying linked dylibs..."
-      # Copy all dylibs that tesseract and its immediate dependencies reference
       for lib in $(otool -L "$TESS_PREFIX/bin/tesseract" | awk '/\/opt\/homebrew|\/usr\/local/{print $1}'); do
         [ -f "$lib" ] && cp "$lib" "$DEST/" && echo "  Copied: $(basename $lib)"
       done
-      # Also copy dylibs referenced by the copied dylibs (one level deep)
       for dylib in "$DEST"/*.dylib; do
         for dep in $(otool -L "$dylib" | awk '/\/opt\/homebrew|\/usr\/local/{print $1}'); do
           [ -f "$dep" ] && [ ! -f "$DEST/$(basename $dep)" ] && cp "$dep" "$DEST/" && echo "  Copied dep: $(basename $dep)"
@@ -259,6 +274,7 @@ release:
     ref: "$CI_COMMIT_SHA"
     assets:
       links:
+        # Note: Make sure these file patterns accurately match your electron-builder config settings!
         - name: "Windows Setup Installer (.exe)"
           url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/pdf-extractor/${CI_COMMIT_TAG}/PDF-Extractor-Setup.exe"
           link_type: package
