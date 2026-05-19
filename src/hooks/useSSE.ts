@@ -80,6 +80,7 @@ export function useSSE() {
                   return { 
                     ...item, 
                     progress: progressData.pct,
+                    method: progressData.method,
                     status: "processing",
                     currentPage: progressData.page,
                     totalPages: progressData.total_pages
