@@ -13,7 +13,7 @@ const TESSERACT_LINUX_URL =
   process.env.TESSERACT_LINUX_URL ||
   "https://github.com/DanielMYT/tesseract-static/releases/download/tesseract-5.5.2/tesseract.x86_64";
 
-// Windows: Official UB Mannheim installer (run silently to place files)
+// Windows: Official UB Mannheim installer (NSIS Framework)
 const TESSERACT_WIN_URL =
   process.env.TESSERACT_WIN_URL ||
   "https://github.com/UB-Mannheim/tesseract/releases/download/v5.4.0.20240606/tesseract-ocr-w64-setup-5.4.0.20240606.exe";
@@ -50,7 +50,6 @@ function downloadFile(url, dest) {
     https
       .get(url, (response) => {
         if (response.statusCode === 302 || response.statusCode === 301) {
-          // Destroy the current stream before following the redirect
           file.close();
           downloadFile(response.headers.location, dest).then(resolve).catch(reject);
           return;
@@ -85,25 +84,61 @@ function extractArchive(filePath, destDir) {
     fs.mkdirSync(destDir, { recursive: true });
   }
 
-  // Case 1: Windows Setup Installer Executable
+  // Case 1: Windows Setup Installer Executable (NSIS)
   if (filePath.endsWith(".exe")) {
-    console.log(`Running silent background installer for Windows to: ${destDir}`);
-    execSync(`"${filePath}" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /DIR="${destDir}"`, {
-      stdio: "inherit",
-    });
+    console.log(`Running silent background installer for Windows...`);
+    // NSIS silent flag is /S. 
+    // /D must be the last parameter and CANNOT be enclosed in quotes.
+    const installCmd = `"${filePath}" /S /D=${destDir}`;
+    console.log(`Executing: ${installCmd}`);
+    execSync(installCmd, { stdio: 'inherit' });
+    
+    // FALLBACK: If UB Mannheim ignored the /D flag, hunt down the global install and copy it.
+    const expectedExe = path.join(destDir, "tesseract.exe");
+    if (!fs.existsSync(expectedExe)) {
+      console.log(`Executable not found at ${destDir}. Hunting in global Program Files...`);
+      const pfLocations = [
+        path.join(process.env.ProgramW6432 || "C:\\Program Files", "Tesseract-OCR"),
+        path.join(process.env.ProgramFiles || "C:\\Program Files", "Tesseract-OCR"),
+        path.join(process.env["ProgramFiles(x86)"] || "C:\\Program Files (x86)", "Tesseract-OCR"),
+        path.join(process.env.LOCALAPPDATA || "C:\\Users\\Default\\AppData\\Local", "Tesseract-OCR")
+      ];
 
-    // Clean up installer residual logs so they aren't bundled into the Electron app
+      let foundPath = null;
+      for (const loc of pfLocations) {
+        if (loc && fs.existsSync(path.join(loc, "tesseract.exe"))) {
+          foundPath = loc;
+          break;
+        }
+      }
+
+      if (foundPath) {
+        console.log(`Found global installation at: ${foundPath}`);
+        console.log(`Copying binaries to local project folder: ${destDir}`);
+        fs.cpSync(foundPath, destDir, { recursive: true });
+        
+        // Clean up the global install so the runner stays pristine
+        const uninstaller = path.join(foundPath, "Uninstall.exe");
+        if (fs.existsSync(uninstaller)) {
+          console.log(`Cleaning up background global installation...`);
+          try { execSync(`"${uninstaller}" /S`, { stdio: 'ignore' }); } catch (e) {}
+        }
+      } else {
+        throw new Error("Tesseract installation failed. Could not locate tesseract.exe anywhere.");
+      }
+    }
+
+    // Remove the NSIS uninstaller from our app bin so it doesn't get bundled into the final Electron app
     try {
-      const uninsFile = path.join(destDir, "unins000.exe");
-      const uninsDat = path.join(destDir, "unins000.dat");
-      if (fs.existsSync(uninsFile)) fs.unlinkSync(uninsFile);
-      if (fs.existsSync(uninsDat)) fs.unlinkSync(uninsDat);
+      const localUninstaller = path.join(destDir, 'Uninstall.exe');
+      if (fs.existsSync(localUninstaller)) fs.unlinkSync(localUninstaller);
     } catch (_) {}
-    console.log("Silent installation complete.");
+
+    console.log("Windows silent installation complete.");
     return;
   }
 
-  // Case 2: Linux Static Raw Executable
+  // Case 2: Linux Static Raw Executable 
   if (filePath.endsWith(".x86_64") || filePath.endsWith("tesseract")) {
     console.log(`Placing raw static binary file for Linux...`);
     const targetBin = path.join(destDir, "tesseract");
@@ -118,9 +153,7 @@ function extractArchive(filePath, destDir) {
 
   if (process.platform === "win32") {
     if (isZip) {
-      execSync(
-        `powershell -Command "Expand-Archive -Path '${filePath}' -DestinationPath '${destDir}' -Force"`,
-      );
+      execSync(`powershell -Command "Expand-Archive -Path '${filePath}' -DestinationPath '${destDir}' -Force"`);
     } else {
       execSync(`tar -xzf "${filePath}" -C "${destDir}"`);
     }
@@ -206,7 +239,7 @@ async function main() {
       console.log(`Tesseract binary set up successfully at: ${binPath}`);
     } else {
       console.warn(
-        `Warning: Executable not found at ${binPath} after extraction. You may need to verify the archive structure.`,
+        `Warning: Executable not found at ${binPath} after extraction. You may need to verify the archive structure.`
       );
     }
   } catch (err) {
