@@ -137,6 +137,7 @@ const Index = () => {
         file: f,
         id: crypto.randomUUID(),
         hash: null as string | null,
+        size: f.size,
         relPath,
         absPath,
       };
@@ -415,11 +416,13 @@ const Index = () => {
                   onRetry={() => {}}
                   dropFiles={async (e) => {
                     if (e.dataTransfer.items) {
+                      console.log("Dropping files from items");
                       const files = await getFilesFromDataTransfer(
                         e.dataTransfer.items,
                       );
                       if (files.length > 0) handleAddFiles(files);
                     } else if (e.dataTransfer.files) {
+                      console.log("Dropping files from file list");
                       handleAddFiles(e.dataTransfer.files);
                     }
                   }}
