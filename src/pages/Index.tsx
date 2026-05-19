@@ -137,6 +137,7 @@ const Index = () => {
         file: f,
         id: crypto.randomUUID(),
         hash: null as string | null,
+        size: f.size,
         relPath,
         absPath,
       };

@@ -79,7 +79,7 @@ export const FileTableRow = React.memo(
             </TableCell>
             <TableCell role="cell">
               <div className="flex items-center gap-2">
-                <Progress value={status === "ready" ? 100 : 50} className="h-1.5 flex-1" aria-label="File hash progress" />
+                <Progress value={0} className="h-1.5 flex-1" aria-label="File hash progress" />
               </div>
             </TableCell>
             <TableCell role="cell">
