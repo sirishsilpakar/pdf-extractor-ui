@@ -129,6 +129,7 @@ export interface SSELogEvent {
 export interface SSEFileProgressEvent {
   type: 'file_progress';
   file: string;
+  method: string;
   pct: number;
   page?: number;
   total_pages?: number;
