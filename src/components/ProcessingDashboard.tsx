@@ -61,6 +61,8 @@ export function ProcessingDashboard({
     }
   }, [pendingFilesCount]);
 
+  useEffect(() => { if (remaining === 0) setT(0); }, [remaining]);
+
   useEffect(() => {
     if (eventErr) {
       if (timerRef.current) clearInterval(timerRef.current);
