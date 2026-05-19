@@ -8,11 +8,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Stable pre-compiled portable binaries
-// Linux: statically compiled build from mugwort-solutions/tesseract-static GitHub releases
+// Linux: Statically compiled raw binary (requires no extraction)
 const TESSERACT_LINUX_URL =
   process.env.TESSERACT_LINUX_URL ||
   "https://github.com/DanielMYT/tesseract-static/releases/download/tesseract-5.5.2/tesseract.x86_64";
-// Windows: Official UB Mannheim portable build (64-bit, includes tesseract.exe + DLLs)
+
+// Windows: Official UB Mannheim installer (run silently to place files)
 const TESSERACT_WIN_URL =
   process.env.TESSERACT_WIN_URL ||
   "https://github.com/UB-Mannheim/tesseract/releases/download/v5.4.0.20240606/tesseract-ocr-w64-setup-5.4.0.20240606.exe";
@@ -80,32 +81,57 @@ function downloadFile(url, dest) {
 }
 
 function extractArchive(filePath, destDir) {
-  console.log(`Extracting archive to ${destDir}...`);
   if (!fs.existsSync(destDir)) {
     fs.mkdirSync(destDir, { recursive: true });
   }
 
+  // Case 1: Windows Setup Installer Executable
+  if (filePath.endsWith(".exe")) {
+    console.log(`Running silent background installer for Windows to: ${destDir}`);
+    execSync(`"${filePath}" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /DIR="${destDir}"`, {
+      stdio: "inherit",
+    });
+
+    // Clean up installer residual logs so they aren't bundled into the Electron app
+    try {
+      const uninsFile = path.join(destDir, "unins000.exe");
+      const uninsDat = path.join(destDir, "unins000.dat");
+      if (fs.existsSync(uninsFile)) fs.unlinkSync(uninsFile);
+      if (fs.existsSync(uninsDat)) fs.unlinkSync(uninsDat);
+    } catch (_) {}
+    console.log("Silent installation complete.");
+    return;
+  }
+
+  // Case 2: Linux Static Raw Executable
+  if (filePath.endsWith(".x86_64") || filePath.endsWith("tesseract")) {
+    console.log(`Placing raw static binary file for Linux...`);
+    const targetBin = path.join(destDir, "tesseract");
+    fs.copyFileSync(filePath, targetBin);
+    console.log("Binary placement complete.");
+    return;
+  }
+
+  // Case 3: Standard Compressed Archives Fallback
+  console.log(`Extracting archive to ${destDir}...`);
   const isZip = filePath.endsWith(".zip");
 
   if (process.platform === "win32") {
-    // Windows extraction using PowerShell
     if (isZip) {
       execSync(
         `powershell -Command "Expand-Archive -Path '${filePath}' -DestinationPath '${destDir}' -Force"`,
       );
     } else {
-      // Tarball on Windows (requires Windows 10+ built-in tar)
       execSync(`tar -xzf "${filePath}" -C "${destDir}"`);
     }
   } else {
-    // macOS / Linux extraction using system command
     if (isZip) {
       execSync(`unzip -o "${filePath}" -d "${destDir}"`);
     } else {
       execSync(`tar -xzf "${filePath}" -C "${destDir}"`);
     }
   }
-  console.log("✓ Extraction complete.");
+  console.log("Extraction complete.");
 }
 
 async function main() {
@@ -113,7 +139,7 @@ async function main() {
   console.log(`Target Platform: ${targetPlatform} (${osDirName})`);
   console.log(`Destination Directory: ${DEST_DIR}`);
 
-  // Create temporary directory
+  // Create temporary workspace directory
   const tmpDir = path.resolve(__dirname, "..", "tmp");
   if (!fs.existsSync(tmpDir)) {
     fs.mkdirSync(tmpDir, { recursive: true });
@@ -124,10 +150,10 @@ async function main() {
 
   if (targetPlatform === "win32") {
     downloadUrl = TESSERACT_WIN_URL;
-    archiveName = "tesseract-win64.zip";
+    archiveName = "tesseract-setup.exe";
   } else if (targetPlatform === "linux") {
     downloadUrl = TESSERACT_LINUX_URL;
-    archiveName = "tesseract-linux.tar.gz";
+    archiveName = "tesseract.x86_64";
   } else {
     console.log(
       "For macOS, Tesseract binaries should be prepared via package:mac workflows (Homebrew binaries compiled locally). Skipping download.",
@@ -139,16 +165,16 @@ async function main() {
 
   try {
     if (fs.existsSync(archivePath)) {
-      console.log(`✓ Temporary archive ${archiveName} already exists, skipping download.`);
+      console.log(`Temporary dependency ${archiveName} already exists, skipping download.`);
     } else {
       await downloadFile(downloadUrl, archivePath);
-      console.log("✓ Successfully downloaded.");
+      console.log("Successfully downloaded.");
     }
 
-    // Unpack
+    // Unpack / Install
     extractArchive(archivePath, DEST_DIR);
 
-    // Clean up temporary archive if requested or needed, but let's keep it clean
+    // Clean up temporary workspace downloads
     try {
       fs.unlinkSync(archivePath);
     } catch (_) {}
@@ -157,17 +183,19 @@ async function main() {
     const exeName = targetPlatform === "win32" ? "tesseract.exe" : "tesseract";
     let binPath = path.join(DEST_DIR, exeName);
 
-    // Some static packages extract into a subfolder, let's check and move files if necessary
-    const subdirs = fs.readdirSync(DEST_DIR);
-    if (!fs.existsSync(binPath) && subdirs.length === 1) {
-      const subDirPath = path.join(DEST_DIR, subdirs[0]);
-      if (fs.statSync(subDirPath).isDirectory()) {
-        console.log(`Moving files from nested directory ${subdirs[0]} to root...`);
-        const files = fs.readdirSync(subDirPath);
-        files.forEach((file) => {
-          fs.renameSync(path.join(subDirPath, file), path.join(DEST_DIR, file));
-        });
-        fs.rmdirSync(subDirPath);
+    // Handle structural nested variations safely
+    if (fs.existsSync(DEST_DIR)) {
+      const subdirs = fs.readdirSync(DEST_DIR);
+      if (!fs.existsSync(binPath) && subdirs.length === 1) {
+        const subDirPath = path.join(DEST_DIR, subdirs[0]);
+        if (fs.statSync(subDirPath).isDirectory()) {
+          console.log(`Moving files from nested directory ${subdirs[0]} to root...`);
+          const files = fs.readdirSync(subDirPath);
+          files.forEach((file) => {
+            fs.renameSync(path.join(subDirPath, file), path.join(DEST_DIR, file));
+          });
+          fs.rmdirSync(subDirPath);
+        }
       }
     }
 

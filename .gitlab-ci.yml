@@ -110,7 +110,7 @@ build-linux:
       
       curl --fail --silent --show-error --header "JOB-TOKEN: $CI_JOB_TOKEN" --output /tmp/pdf-extractor-backend-linux.tar.gz "$LINUX_BACKEND_URL"
       mkdir -p bin/linux/backend
-      tar xzf /tmp/pdf-extractor-backend-linux.tar.gz -d bin/linux/backend/
+      tar xzf /tmp/pdf-extractor-backend-linux.tar.gz -C bin/linux/backend/
 
     - node scripts/download_tesseract.js --platform=linux
     - node scripts/download_tessdata.js
