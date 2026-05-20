@@ -43,6 +43,9 @@ export function useSSE() {
       // Job just finished or is idle
       queryClient.invalidateQueries({ queryKey: ["runs"] });
       queryClient.invalidateQueries({ queryKey: ["results"] });
+      state.setTotalFiles(0);
+      state.setCompletedFiles(0);
+      state.setOverallProgress(0);
     }
   }, [queryClient]);
 
