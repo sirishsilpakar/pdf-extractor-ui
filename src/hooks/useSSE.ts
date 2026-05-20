@@ -3,6 +3,7 @@ import { useAppStore } from "@/store/useAppStore";
 import { SSE_URL } from "@/lib/api";
 import { useQueryClient } from "@tanstack/react-query";
 import type { SSEEvent, SSEStateUpdateEvent, PDFFile, SSEFileProgressEvent } from "@/types";
+import { toast } from "@/components/ui/sonner";
 
 export function useSSE() {
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -43,9 +44,23 @@ export function useSSE() {
       // Job just finished or is idle
       queryClient.invalidateQueries({ queryKey: ["runs"] });
       queryClient.invalidateQueries({ queryKey: ["results"] });
-      state.setTotalFiles(0);
-      state.setCompletedFiles(0);
-      state.setOverallProgress(0);
+
+      if (data.status === "done") {
+        toast.success("Extraction is completed", { 
+          action : { 
+            label: "View results", 
+            onClick: () => {
+              state.setCurrentView("results");
+              state.setResultsRunFilter(data.run_id);
+            } 
+          }, 
+          duration: 5000
+        }); 
+        state.setPendingFiles([]);
+        state.setTotalFiles(0);
+        state.setCompletedFiles(0);
+        state.setOverallProgress(0);
+      }
     }
   }, [queryClient]);
 
