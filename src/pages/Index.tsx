@@ -170,7 +170,7 @@ const Index = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ path }),
       });
-      
+
       store.setCurrentView("dashboard");
 
       if (!res.ok) {
@@ -181,7 +181,7 @@ const Index = () => {
         );
         return;
       }
-     
+
       const data = await res.json();
       if (data.batch_id) {
         getBatchStatusStream();
@@ -416,9 +416,16 @@ const Index = () => {
                   onRetry={() => {}}
                   dropFiles={async (e) => {
                     if (e.dataTransfer.items) {
-                      const files = await getFilesFromDataTransfer(
-                        e.dataTransfer.items,
+                      const hasFolder = Array.from(e.dataTransfer.items).some(
+                        (item) => item.webkitGetAsEntry()?.isDirectory,
                       );
+                      if (hasFolder) {
+                        toast.error(
+                          "Folders are not supported. Please upload PDF files only.",
+                        );
+                        return;
+                      }
+                      const files = await getFilesFromDataTransfer(e.dataTransfer.items);
                       if (files.length > 0) handleAddFiles(files);
                     } else if (e.dataTransfer.files) {
                       handleAddFiles(e.dataTransfer.files);
