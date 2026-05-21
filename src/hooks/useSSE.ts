@@ -5,6 +5,15 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { SSEEvent, SSEStateUpdateEvent, PDFFile, SSEFileProgressEvent } from "@/types";
 import { toast } from "@/components/ui/sonner";
 
+function resetDashboard(state) { 
+  state.setPendingFiles([]);
+  state.setTotalFiles(0);
+  state.setCompletedFiles(0);
+  state.setOverallProgress(0);
+  state.setIsProcessing(false);
+  state.setProcessingFile("");
+}
+
 export function useSSE() {
   const abortControllerRef = useRef<AbortController | null>(null);
   const queryClient = useQueryClient();
@@ -15,7 +24,7 @@ export function useSSE() {
     
     state.setIsProcessing(running);
     
-    if (running || (data.total && data.total > 0)) {
+    if (running) {
       const total = data.total || 0;
       const done = data.done || 0;
       const calculatedProgress = total > 0 ? Math.floor((done / total) * 100) : 0;
@@ -38,6 +47,13 @@ export function useSSE() {
       if (data.current_file) state.setProcessingFile(data.current_file);
     }
 
+    if (data.status === "cancelled" && !!data?.current_file) {
+      toast.warning("Extraction is cancelled", {  
+        duration: 5000
+      }); 
+      resetDashboard(state);
+    }
+
     if (running) {
       queryClient.invalidateQueries({ queryKey: ["job-files"] });
     } else {
@@ -56,10 +72,7 @@ export function useSSE() {
           }, 
           duration: 5000
         }); 
-        state.setPendingFiles([]);
-        state.setTotalFiles(0);
-        state.setCompletedFiles(0);
-        state.setOverallProgress(0);
+        resetDashboard(state);
       }
     }
   }, [queryClient]);

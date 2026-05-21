@@ -29,7 +29,7 @@ import {
 import { useSearch, useReindexSearch } from "@/hooks/queries/useSearch";
 import { API_BASE, BATCH_SSE_URL, fetcher } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
-import { FilesListItem, PaginationState } from "@/types";
+import { FilesListItem, NavView, PaginationState } from "@/types";
 
 const Index = () => {
   const store = useAppStore();
@@ -50,6 +50,12 @@ const Index = () => {
   useEffect(() => {
     setSearchPage(1);
   }, [store.searchQuery]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      store.setCurrentView(localStorage.getItem('view') as NavView)
+    }
+  }, [])
 
   // Queries
   const { data: jobStatus } = useJobStatus();
@@ -359,7 +365,10 @@ const Index = () => {
       <div className="flex flex-1 overflow-hidden">
         <AppSidebar
           currentView={store.currentView}
-          onViewChange={store.setCurrentView}
+          onViewChange={(v) => {
+              localStorage.setItem('view', v)
+              store.setCurrentView(v);
+          }}
           stats={{
             total: store.totalFiles,
             completed: store.completedFiles,

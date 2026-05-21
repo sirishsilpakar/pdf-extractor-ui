@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ClipboardList, ChevronDown, ChevronRight, Download, Eye, FileJson, FolderOpen, RefreshCw, X } from "lucide-react";
 import type { ExtractionResult, ExtractionResultDetail, PaginationState } from "@/types";
 import { cn } from "@/lib/utils";
 import { FileViewerModal } from "./FileViewerModal";
+import { formatDistanceToNow } from "date-fns"
 
 interface Props {
   results: ExtractionResult[];
@@ -27,7 +28,19 @@ export function ResultsPanel({ results, pagination, runFilter, onRunFilterChange
   // Group by Run ID then by Directory
   const runGroups: Record<string, { timestamp: number, date: string, dirs: Record<string, ExtractionResult[]> }> = {};
   const allRunIds = new Set<string>();
-  
+
+  useEffect(() => {
+    if (runFilter) {
+      setCollapsedRuns(new Set());
+    } else {
+      const runIDs = new Set<string>();
+      results.forEach((r) => {
+        runIDs.add(r.run_id)
+      })
+      setCollapsedRuns(runIDs);
+    }
+  }, [results, runFilter])
+
   results.forEach(r => {
     const runId = r.run_id || "no-run";
     allRunIds.add(runId);
@@ -145,7 +158,7 @@ export function ResultsPanel({ results, pagination, runFilter, onRunFilterChange
               )}
             </div>
           )}
-          <Button variant="outline" size="sm" onClick={onRefresh} className="gap-2 rounded-xl h-8">
+          <Button variant="outline" size="sm" onClick={onRefresh} className="gap-2 rounded-xl h-8 hover:bg-primary hover:text-white">
             <RefreshCw className="h-4 w-4" /> Refresh
           </Button>
         </div>
@@ -178,14 +191,19 @@ export function ResultsPanel({ results, pagination, runFilter, onRunFilterChange
                 ? <ChevronRight className="h-5 w-5 text-primary shrink-0" />
                 : <ChevronDown className="h-5 w-5 text-primary shrink-0" />
               }
-              <div className="flex-1">
+              <div className="w-full flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="font-bold text-sm">Run: {runId === "no-run" ? "Direct Uploads" : runId.slice(0, 8)}</span>
-                  <Badge variant="outline" className="bg-background/50 text-[10px] uppercase">{group.date}</Badge>
+                  <p className="text-[10px] text-muted-foreground">
+                    {(runFilter && runId === runFilter) ? pagination.total : Object.values(group.dirs).flat().length} {Object.values(group.dirs).flat().length > 1 ? 'files' : 'file'} in this run
+                  </p>
                 </div>
-                <p className="text-[10px] text-muted-foreground mt-0.5">
-                  {(runFilter && runId === runFilter) ? pagination.total : Object.values(group.dirs).flat().length} files in this run
-                </p>
+                <Badge variant="outline" className="bg-primary/50 text-[10px] capitalize text-white">
+                  {formatDistanceToNow(group.date, {
+                    addSuffix: true,
+                    includeSeconds: true,
+                  })}
+                </Badge>
               </div>
             </button>
 
@@ -264,7 +282,7 @@ export function ResultsPanel({ results, pagination, runFilter, onRunFilterChange
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-7 w-7 rounded-lg"
+                                    className="h-7 w-7 rounded-lg hover:bg-primary hover:text-white"
                                     onClick={() => handleView(r)}
                                     title="View text"
                                   >
@@ -274,7 +292,7 @@ export function ResultsPanel({ results, pagination, runFilter, onRunFilterChange
                                     href={getDownloadUrl(r.id)}
                                     download={`${fname}.txt`}
                                     title="Download .txt"
-                                    className="inline-flex items-center justify-center h-7 w-7 rounded-lg hover:bg-accent transition-colors"
+                                    className="inline-flex items-center justify-center h-7 w-7 rounded-lg transition-colors hover:bg-primary hover:text-white"
                                   >
                                     <Download className="h-3.5 w-3.5" />
                                   </a>
