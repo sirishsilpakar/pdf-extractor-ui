@@ -172,8 +172,8 @@ export function RunsPanel({
               const total = run.totalFiles || 1;
 
               const directPct = Math.round((direct / total) * 100);
-              const ocrPct = Math.round((ocr / total) * 100);
               const failedPct = Math.round((failed / total) * 100);
+              const ocrPct = 100 - directPct - failedPct;
 
               const statusInfo = {
                 running: {
