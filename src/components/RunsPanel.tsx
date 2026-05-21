@@ -11,7 +11,10 @@ import {
   Clock4,
   FileMinus,
   FolderDown,
-  ScanLine
+  ScanLine,
+  TriangleAlert,
+  Ban,
+  FileCog
 } from "lucide-react";
 import type { Run, PaginationState } from "@/types";
 import { cn } from "@/lib/utils";
@@ -177,24 +180,30 @@ export function RunsPanel({
 
               const statusInfo = {
                 running: {
-                  label: "Processing",
+                  label: "Processing...",
                   color: "bg-primary/10 text-primary border-primary/30",
+                  icon: <FileCog width={12} height={12} className="mr-2" />
                 },
                 completed: {
                   label: "Completed",
                   color: "bg-success/10 text-success border-success/30",
+                  icon: <CircleCheckBig width={12} height={12} className="mr-2" />
                 },
                 failed: {
                   label: "Failed",
-                  color:
-                    "bg-destructive/10 text-destructive border-destructive/30",
+                  color: "bg-destructive/10 text-destructive border-destructive/30",
+                  icon: <Ban width={12} height={12} className="mr-2" />
                 },
                 cancelled: {
                   label: "Cancelled",
-                  color:
-                    "bg-yellow-500/10 text-yellow-500 border-yellow-500/30",
+                  color: "bg-yellow-500/10 text-yellow-500 border-yellow-500/30",
+                  icon: <TriangleAlert width={12} height={12} className="mr-2" />
                 },
-                done: { label: "Done", color: "bg-green-500/10 text-green-700" },
+                done: { 
+                  label: "Done", 
+                  color: "bg-green-500/10 text-green-700 border-success/30",
+                  icon: <CircleCheckBig width={12} height={12} className="mr-2" />
+                },
               }[run.status] ?? {
                 label: run.status.toUpperCase(),
                 color: "bg-green-50 text-green-700",
@@ -224,11 +233,7 @@ export function RunsPanel({
                           statusInfo.color,
                         )}
                       >
-                        <CircleCheckBig
-                          width={12}
-                          height={12}
-                          className="mr-2"
-                        />{" "}
+                        {statusInfo.icon ? statusInfo.icon : "" }
                         {statusInfo.label}
                       </Badge>
                     </div>
