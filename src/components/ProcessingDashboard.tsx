@@ -114,10 +114,10 @@ export function ProcessingDashboard({
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel className="rounded-xl">
+                  <AlertDialogCancel className="rounded-xl bg-inherit hover:bg-primary hover:text-white">
                     Keep Going
                   </AlertDialogCancel>
-                  <AlertDialogAction className="rounded-xl" onClick={onCancel}>
+                  <AlertDialogAction className="rounded-xl bg-red-600 hover:bg-red-700" onClick={onCancel}>
                     Cancel Processing
                   </AlertDialogAction>
                 </AlertDialogFooter>

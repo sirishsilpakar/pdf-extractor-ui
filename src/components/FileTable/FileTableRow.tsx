@@ -86,7 +86,7 @@ export const FileTableRow = React.memo(
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7 rounded-lg text-muted-foreground hover:text-destructive"
+                className="h-7 w-7 rounded-lg text-muted-foreground hover:text-destructive hover:bg-transparent"
                 onClick={() => onRemove(pf.id)}
                 aria-label="Remove pending file"
               >
