@@ -12,6 +12,8 @@ function resetDashboard(state) {
   state.setOverallProgress(0);
   state.setIsProcessing(false);
   state.setProcessingFile("");
+  state.setElapsedSeconds(0);
+  state.setEtaSeconds(null);
 }
 
 export function useSSE() {
@@ -45,6 +47,8 @@ export function useSSE() {
       state.setCompletedFiles(done);
       state.setCurrentRunId(data.run_id || null);
       if (data.current_file) state.setProcessingFile(data.current_file);
+      if (data.elapsed !== undefined) state.setElapsedSeconds(data.elapsed);
+      if (data.eta_seconds !== undefined) state.setEtaSeconds(data.eta_seconds);
     }
 
     if (data.status === "cancelled" && !!data?.current_file) {

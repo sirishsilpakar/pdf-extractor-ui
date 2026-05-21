@@ -397,6 +397,8 @@ const Index = () => {
                   processingFile={store.processingFile}
                   pendingFilesCount={store.pendingFiles.length}
                   isProcessing={store.isProcessing}
+                  elapsedSeconds={store.elapsedSeconds}
+                  etaSeconds={store.etaSeconds}
                   onCancel={() => {
                     cancelJob();
                     store.setSkipProcessedFiles(false);
