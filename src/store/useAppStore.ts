@@ -78,6 +78,12 @@ interface SSEState {
   /** True when the user chose to skip already processed files for the current job. */
   skipProcessedFiles: boolean;
   setSkipProcessedFiles: (val: boolean) => void;
+
+  elapsedSeconds: number;
+  setElapsedSeconds: (val: number) => void;
+
+  etaSeconds: number | null;
+  setEtaSeconds: (val: number | null) => void;
 }
 
 type AppState = UIState & SelectionState & SettingsState & LogState & PendingFilesState & ReprocessState & SSEState;
@@ -167,4 +173,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   setCurrentRunId: (val) => set({ currentRunId: val }),
   skipProcessedFiles: false,
   setSkipProcessedFiles: (val) => set({ skipProcessedFiles: val }),
+  elapsedSeconds: 0,
+  setElapsedSeconds: (val) => set({ elapsedSeconds: val }),
+  etaSeconds: null,
+  setEtaSeconds: (val) => set({ etaSeconds: val }),
 }));

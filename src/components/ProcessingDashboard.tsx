@@ -24,6 +24,8 @@ interface Props {
   pendingFilesCount: number;
   isProcessing: boolean;
   eventErr: boolean;
+  elapsedSeconds?: number;
+  etaSeconds?: number | null;
   onCancel: () => void;
   onStart: () => void;
 }
@@ -36,6 +38,8 @@ export function ProcessingDashboard({
   pendingFilesCount = 0,
   isProcessing,
   eventErr,
+  elapsedSeconds,
+  etaSeconds,
   onCancel,
   onStart,
 }: Props) {
@@ -56,6 +60,12 @@ export function ProcessingDashboard({
   }, [isProcessing]);
 
   useEffect(() => {
+    if (elapsedSeconds !== undefined && elapsedSeconds > t) {
+      setT(elapsedSeconds);
+    }
+  }, [elapsedSeconds]);
+
+  useEffect(() => {
     if (pendingFilesCount > 0) {
       setT(0);
     }
@@ -70,7 +80,14 @@ export function ProcessingDashboard({
     }
   }, [eventErr]);
 
-  const eta = remaining > 0 ? `~${Math.floor(remaining * Math.PI)}s` : "0s";
+  let etaStr = "0s";
+  if (remaining > 0) {
+    if (etaSeconds !== undefined && etaSeconds !== null) {
+      etaStr = `~${etaSeconds}s`;
+    } else {
+      etaStr = "Calculating...";
+    }
+  }
 
   return (
     <div className="glass rounded-2xl p-5 space-y-4">
@@ -156,7 +173,7 @@ export function ProcessingDashboard({
             label: "Elapsed",
             value: `${String((t / 60) | 0).padStart(2, "0")}:${String((t % 60) | 0).padStart(2, "0")}`,
           },
-          { label: "ETA", value: eta },
+          { label: "ETA", value: etaStr },
           { label: "Processed", value: `${completedFiles}/${totalFiles}` },
           { label: "Remaining", value: String(remaining) },
         ].map((s) => (

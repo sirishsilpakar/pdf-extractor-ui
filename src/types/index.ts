@@ -116,6 +116,8 @@ export interface SSEStateUpdateEvent {
   done: number;
   total: number;
   progress_pct: number;
+  elapsed?: number;
+  eta_seconds?: number | null;
   run_id?: string;
   current_file?: string;
 }
