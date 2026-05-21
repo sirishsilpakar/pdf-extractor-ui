@@ -76,7 +76,7 @@ export function ProcessingDashboard({
     <div className="glass rounded-2xl p-5 space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Zap className="h-4 w-4 text-accent" aria-hidden="true" />
+          <Zap className="h-4 w-4 text-primary" aria-hidden="true" />
           <h2 className="font-semibold text-sm">
             Processing Dashboard
           </h2>

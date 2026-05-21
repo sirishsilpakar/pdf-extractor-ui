@@ -28,7 +28,7 @@ export function PathImporter({ onAddPath }: PathImporterProps) {
       <Button
         variant="outline"
         size="sm"
-        className="rounded-xl gap-1.5 text-xs"
+        className="bg-inherit rounded-xl gap-1.5 text-xs hover:bg-primary hover:text-white"
         onClick={() => onImportFiles("single")}
         aria-label="Import File Button"
       >
@@ -37,7 +37,7 @@ export function PathImporter({ onAddPath }: PathImporterProps) {
       <Button
         variant="outline"
         size="sm"
-        className="rounded-xl gap-1.5 text-xs"
+        className="bg-inherit rounded-xl gap-1.5 text-xs hover:bg-primary hover:text-white"
         onClick={() => onImportFiles("multiple")}
         aria-label="Import Folder Button"
       >

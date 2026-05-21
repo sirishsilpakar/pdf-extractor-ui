@@ -73,7 +73,7 @@ export function SearchPanel({
           <Button onClick={handleSearch} className="rounded-xl px-5">
             Search
           </Button>
-          <Button variant="outline" onClick={onReindex} className="rounded-xl gap-2" title="Build full-text search index from all extracted files">
+          <Button variant="outline" onClick={onReindex} className="rounded-xl gap-2 hover:bg-primary hover:text-white" title="Build full-text search index from all extracted files">
             <RefreshCw className="h-4 w-4" />
             <span className="hidden sm:inline">Build Index</span>
           </Button>
@@ -134,7 +134,7 @@ export function SearchPanel({
                     <Button
                       variant="outline"
                       size="sm"
-                      className="rounded-lg h-7 text-xs"
+                      className="rounded-lg h-7 text-xs hover:bg-primary hover:text-white"
                       onClick={() => handleView(r)}
                     >
                       View →
