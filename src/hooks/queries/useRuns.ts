@@ -1,6 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { fetcher } from "@/lib/api";
-import type { Run, PaginationState } from "@/types";
+import type { Run, PaginationState, ExtractionResult } from "@/types";
 
 export function useRuns(page: number, size: number) {
   return useQuery({
@@ -15,7 +15,7 @@ export function useRuns(page: number, size: number) {
         failedFiles: r.failed_files || 0,
         directFiles: r.direct_files || 0,
         ocrFiles: r.ocr_files || 0,
-        startedAt: r.started_at ? new Date(r.started_at) : new Date(),
+        startedAt: r.started_at ? new Date(r.started_at as string) : new Date(),
         elapsedSeconds: r.elapsed_seconds || 0,
         etaSeconds: r.eta_seconds || null,
         progressPct: r.progress_pct || 0,
@@ -33,23 +33,80 @@ export function useRuns(page: number, size: number) {
   });
 }
 
-export function useRunFiles(runId: string | null, page: number, size: number) {
+export function useRun(runId: string | null) {
   return useQuery({
-    queryKey: ["run-files", runId, page, size],
+    queryKey: ["run", runId],
     queryFn: async () => {
       if (!runId) return null;
-      const data = await fetcher<{ items: Record<string, unknown>[]; page: number; size: number; total: number; pages: number }>(`/runs/${encodeURIComponent(runId)}/files?page=${page}&size=${size}`);
+      const r = await fetcher<Record<string, unknown>>(`/runs/${encodeURIComponent(runId)}`);
       return {
-        items: data.items || [],
-        pagination: {
-          page: data.page || page,
-          size: data.size || size,
-          total: data.total || 0,
-          pages: Math.ceil((data.total || 0) / size) || 1,
-        } as PaginationState,
-      };
+        id: r.run_id || r.id || String(Math.random()),
+        status: r.status || "unknown",
+        totalFiles: r.total_files || 0,
+        completedFiles: r.done_files || r.completed_files || 0,
+        failedFiles: r.failed_files || 0,
+        directFiles: r.direct_files || 0,
+        ocrFiles: r.ocr_files || 0,
+        startedAt: r.started_at ? new Date(r.started_at as string) : new Date(),
+        elapsedSeconds: r.elapsed_seconds || 0,
+        etaSeconds: r.eta_seconds || null,
+        progressPct: r.progress_pct || 0,
+      } as Run;
     },
     enabled: !!runId,
+  });
+}
+
+export interface RunTreeDirectory {
+  run_id: string;
+  path: string;
+  count: number;
+}
+
+export interface RunIdItem {
+  run_id: string;
+}
+
+export interface RunTreeResponse {
+  directories: RunTreeDirectory[];
+  directories_total: number;
+  top_level_files: ExtractionResult[];
+  top_level_files_total: number;
+  page: number;
+  size: number;
+  pages: number;
+}
+
+export function useRunTree(runId: string | null, page: number = 1, size: number = 50) {
+  return useQuery({
+    queryKey: ["run-tree", runId, page, size],
+    queryFn: async () => {
+      const url = runId 
+        ? `/results/tree?run_id=${encodeURIComponent(runId)}&page=${page}&size=${size}`
+        : `/results/tree?page=${page}&size=${size}`;
+      return await fetcher<RunTreeResponse>(url);
+    },
+    // Removed `enabled: !!runId` because we now want to fetch the global tree if runId is null
+  });
+}
+
+export function useRunFiles(runId: string | null, directory: string | null, size: number = 50) {
+  return useInfiniteQuery({
+    queryKey: ["run-files-infinite", runId, directory, size],
+    queryFn: async ({ pageParam = 1 }) => {
+      if (!runId) return { items: [], nextCursor: undefined };
+      const dirParam = directory !== null ? `&directory=${encodeURIComponent(directory)}` : "";
+      const data = await fetcher<{ items: ExtractionResult[]; page: number; size: number; total: number; pages: number }>(
+        `/results?page=${pageParam}&size=${size}&run_id=${encodeURIComponent(runId)}${dirParam}`
+      );
+      return {
+        items: data.items || [],
+        nextCursor: data.page < data.pages ? data.page + 1 : undefined,
+      };
+    },
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    enabled: !!runId && directory !== null, // Only fetch when a specific directory is selected
   });
 }
 
@@ -62,5 +119,20 @@ export function useRunLog(runId: string | null) {
       return res;
     },
     enabled: !!runId,
+  });
+}
+
+export function useAllRunIds() {
+  return useInfiniteQuery({
+    queryKey: ["run-ids-infinite"],
+    queryFn: async ({ pageParam = 1 }) => {
+      const data = await fetcher<{ items: RunIdItem[]; page: number; size: number; total: number; pages: number }>(`/runs/ids?page=${pageParam}&size=20`);
+      return {
+        items: data.items || [],
+        nextCursor: data.page < data.pages ? data.page + 1 : undefined,
+      };
+    },
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
   });
 }
