@@ -65,7 +65,7 @@ export function useSSE() {
       queryClient.invalidateQueries({ queryKey: ["runs"] });
       queryClient.invalidateQueries({ queryKey: ["results"] });
 
-      if (data.status === "done") {
+      if (data.status === "done" && data.total !== 0) {
         toast.success("Extraction is completed", { 
           action : { 
             label: "View results", 
