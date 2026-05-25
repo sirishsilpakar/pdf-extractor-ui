@@ -102,6 +102,128 @@ const FileRow = ({
     </div>
   );
 };
+
+const DirectoryItem = ({
+  runId,
+  directory,
+  count,
+  onView,
+  getDownloadUrl,
+}: {
+  runId: string;
+  directory: string;
+  count: number;
+  onView: (r: ExtractionResult) => void;
+  getDownloadUrl: (id: number) => string;
+}) => {
+  const [expanded, setExpanded] = useState(false);
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = useRunFiles(
+    expanded ? runId : null,
+    directory,
+    5,
+  );
+
+  const allItems = data ? data.pages.flatMap((p) => p.items) : [];
+
+  const parentRef = useRef<HTMLDivElement>(null);
+  const virtualizer = useVirtualizer({
+    count: hasNextPage ? allItems.length + 1 : allItems.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 52, // Matches FileRow h-[52px]
+    overscan: 5,
+  });
+
+  const virtualItems = virtualizer.getVirtualItems();
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    // If scrolled within 100px of the bottom, fetch next page
+    if (target.scrollHeight - target.scrollTop - target.clientHeight < 100) {
+      if (hasNextPage && !isFetchingNextPage) {
+        fetchNextPage();
+      }
+    }
+  };
+
+  return (
+    <div className="flex flex-col">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center gap-2.5 px-6 py-3 bg-secondary/20 hover:bg-secondary/40 transition-colors text-left border-b border-border/10"
+      >
+        {expanded ? (
+          <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+        ) : (
+          <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+        )}
+        <FolderOpen className="h-4 w-4 text-primary shrink-0 opacity-70" />
+        <span className="font-semibold text-xs flex-1 text-muted-foreground truncate flex items-center gap-2">
+          {directory || "(root)"}
+          {showRunInfo && runId && (
+            <span className="text-[10px] text-muted-foreground/50 font-normal hidden sm:inline-block">
+              {runId === "no-run" ? "Direct" : `Run ${runId.slice(0, 8)}`}
+            </span>
+          )}
+        </span>
+        <span className="text-[10px] text-muted-foreground font-medium bg-secondary/80 px-2 py-0.5 rounded-full">
+          {count}
+        </span>
+      </button>
+
+      {expanded && (
+        <div className="bg-background/20 relative">
+          {isLoading && (
+            <div className="p-4 text-xs text-muted-foreground flex items-center justify-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading files...
+            </div>
+          )}
+
+          <div
+            ref={parentRef}
+            className="max-h-[240px] overflow-y-auto no-scrollbar"
+            onScroll={handleScroll}
+          >
+            <div
+              style={{
+                height: `${virtualizer.getTotalSize()}px`,
+                width: "100%",
+                position: "relative",
+              }}
+            >
+              {virtualItems.map((virtualRow) => {
+                const isLoaderRow = virtualRow.index > allItems.length - 1;
+                const item = allItems[virtualRow.index];
+
+                return (
+                  <div
+                    key={virtualRow.key}
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      width: "100%",
+                      height: `${virtualRow.size}px`,
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
+                  >
+                    {isLoaderRow ? (
+                      <div className="flex items-center justify-center h-full text-xs text-muted-foreground gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin text-primary" /> Fetching more...
+                      </div>
+                    ) : (
+                      item && <FileRow r={item} onView={onView} getDownloadUrl={getDownloadUrl} />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 interface Props {
   results: ExtractionResult[];
   pagination: PaginationState;
