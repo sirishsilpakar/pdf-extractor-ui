@@ -1,12 +1,107 @@
-import { useEffect, useState } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ClipboardList, ChevronDown, ChevronRight, Download, Eye, FileJson, FolderOpen, RefreshCw, X } from "lucide-react";
-import type { ExtractionResult, ExtractionResultDetail, PaginationState } from "@/types";
+import {
+  ClipboardList,
+  ChevronDown,
+  ChevronRight,
+  Download,
+  Eye,
+  FolderOpen,
+  RefreshCw,
+  X,
+  Loader2,
+} from "lucide-react";
+import type { ExtractionResult, ExtractionResultDetail, PaginationState, Run } from "@/types";
 import { cn } from "@/lib/utils";
 import { FileViewerModal } from "./FileViewerModal";
-import { formatDistanceToNow } from "date-fns"
+import { useRunTree, useRunFiles, useAllRunIds, useRun } from "@/hooks/queries/useRuns";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
+const FileRow = ({
+  r,
+  onView,
+  getDownloadUrl,
+  showRunInfo,
+}: {
+  r: ExtractionResult;
+  onView: (r: ExtractionResult) => void;
+  getDownloadUrl: (id: number) => string;
+  showRunInfo?: boolean;
+}) => {
+  const fname =
+    r.rel_path
+      .replace(/\.pdf$/i, "")
+      .split("/")
+      .pop() || r.filename;
+  const highConf = r.confidence !== null && r.confidence !== undefined && r.confidence >= 0.85;
+
+  return (
+    <div className="flex items-center gap-3 px-10 py-2 hover:bg-secondary/20 transition-colors group h-[52px]">
+      <span
+        className="flex-1 text-sm font-medium truncate flex items-center gap-2"
+        title={r.rel_path}
+      >
+        <span>{fname}</span>
+        {showRunInfo && r.run_id && (
+          <span className="text-[10px] text-muted-foreground/50 font-normal shrink-0">
+            {r.run_id === "no-run" ? "Direct" : `Run #${r.run_id.slice(0, 8)}`}
+          </span>
+        )}
+      </span>
+      <Badge
+        variant="outline"
+        className="rounded-md text-[9px] uppercase font-bold tracking-wider shrink-0 h-5"
+      >
+        {r.method || "?"}
+      </Badge>
+      {confPct && (
+        <span
+          className={cn(
+            "text-[11px] font-semibold shrink-0 w-12 text-right",
+            highConf ? "text-success" : "text-destructive",
+          )}
+        >
+          {confPct}
+        </span>
+      )}
+      <span className="text-[11px] text-muted-foreground shrink-0 w-16 text-right">
+        {r.char_count}
+      </span>
+      {dt && (
+        <span className="text-[11px] text-muted-foreground shrink-0 hidden lg:block opacity-60 w-16 text-right">
+          {dt}
+        </span>
+      )}
+      <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity w-16 justify-end">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 rounded-lg hover:bg-primary hover:text-white"
+          onClick={() => onView(r)}
+          title="View text"
+        >
+          <Eye className="h-3.5 w-3.5" />
+        </Button>
+        <a
+          href={getDownloadUrl(r.id)}
+          download={`${fname}.txt`}
+          title="Download .txt"
+          className="inline-flex items-center justify-center h-7 w-7 rounded-lg transition-colors hover:bg-primary hover:text-white"
+        >
+          <Download className="h-3.5 w-3.5" />
+        </a>
+      </div>
+    </div>
+  );
+};
 interface Props {
   results: ExtractionResult[];
   pagination: PaginationState;
