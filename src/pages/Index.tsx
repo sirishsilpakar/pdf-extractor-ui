@@ -29,7 +29,7 @@ import {
 import { useSearch, useReindexSearch } from "@/hooks/queries/useSearch";
 import { API_BASE, BATCH_SSE_URL, fetcher } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
-import { FilesListItem, NavView, PaginationState } from "@/types";
+import { FilesListItem, NavView, PaginationState, ProcessingSettings } from "@/types";
 
 const Index = () => {
   const store = useAppStore();
@@ -486,20 +486,8 @@ const Index = () => {
 
             {store.currentView === "results" && (
               <ResultsPanel
-                results={resultsData?.items || []}
-                pagination={
-                  resultsData?.pagination || {
-                    page: 1,
-                    size: 10,
-                    total: 0,
-                    pages: 1,
-                  }
-                }
                 runFilter={store.resultsRunFilter}
-                isLoading={isResultsLoading}
                 onRunFilterChange={store.setResultsRunFilter}
-                onPageChange={setResultsPage}
-                onRefresh={() => refetchResults()}
                 onGetDetail={async (id) => {
                   try {
                     return await fetcher(`/results/${id}`);

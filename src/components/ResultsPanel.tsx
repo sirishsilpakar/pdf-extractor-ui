@@ -52,7 +52,7 @@ const FileRow = ({
         <span>{fname}</span>
         {showRunInfo && r.run_id && (
           <span className="text-[10px] text-muted-foreground/50 font-normal shrink-0">
-            {r.run_id === "no-run" ? "Direct" : `Run #${r.run_id.slice(0, 8)}`}
+            {r.run_id === "no-run" ? "Direct" : `Run #${r.run_number ?? r.run_id.slice(0, 8)}`}
           </span>
         )}
       </span>
@@ -105,16 +105,20 @@ const FileRow = ({
 
 const DirectoryItem = ({
   runId,
+  runNumber,
   directory,
   count,
   onView,
   getDownloadUrl,
+  showRunInfo,
 }: {
   runId: string;
+  runNumber?: number | null;
   directory: string;
   count: number;
   onView: (r: ExtractionResult) => void;
   getDownloadUrl: (id: number) => string;
+  showRunInfo?: boolean;
 }) => {
   const [expanded, setExpanded] = useState(false);
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = useRunFiles(
@@ -161,7 +165,7 @@ const DirectoryItem = ({
           {directory || "(root)"}
           {showRunInfo && runId && (
             <span className="text-[10px] text-muted-foreground/50 font-normal hidden sm:inline-block">
-              {runId === "no-run" ? "Direct" : `Run ${runId.slice(0, 8)}`}
+              {runId === "no-run" ? "Direct" : `Run #${runNumber ?? runId.slice(0, 8)}`}
             </span>
           )}
         </span>
@@ -359,6 +363,7 @@ export function ResultsPanel({ runFilter, onRunFilterChange, onGetDetail, getDow
               <DirectoryItem
                 key={`${dir.run_id}-${dir.path}`}
                 runId={dir.run_id}
+                runNumber={dir.run_number}
                 directory={dir.path}
                 count={dir.count}
                 onView={handleView}
@@ -381,6 +386,8 @@ export function ResultsPanel({ runFilter, onRunFilterChange, onGetDetail, getDow
 
             {tree && tree.directories.length === 0 && tree.top_level_files.length === 0 && (
               <div className="p-12 flex flex-col items-center justify-center gap-4">
+                <ClipboardList className="h-8 w-8 text-muted-foreground opacity-50" />
+                <p className="font-medium text-muted-foreground">No extracted files found.</p>
               </div>
             )}
 
@@ -388,6 +395,7 @@ export function ResultsPanel({ runFilter, onRunFilterChange, onGetDetail, getDow
             {tree && tree.pages > 1 && (
               <div className="flex items-center justify-between p-4">
                 <p className="text-xs text-muted-foreground">
+                  Showing page {tree.page} of {tree.pages}
                 </p>
                 <div className="flex items-center gap-2">
                   <Button

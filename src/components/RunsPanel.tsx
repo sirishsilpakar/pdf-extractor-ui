@@ -48,15 +48,16 @@ export function RunsPanel({
 }: Props) {
   const [viewingLog, setViewingLog] = useState<{
     id: string;
+    runNumber?: number;
     content: string;
   } | null>(null);
   const [loadingLog, setLoadingLog] = useState(false);
 
-  const handleLoadLog = async (runId: string) => {
+  const handleLoadLog = async (runId: string, runNumber?: number) => {
     setLoadingLog(true);
     const content = await onLoadRunLog(runId);
     if (content) {
-      setViewingLog({ id: runId, content });
+      setViewingLog({ id: runId, runNumber, content });
     }
     setLoadingLog(false);
   };
@@ -95,7 +96,7 @@ export function RunsPanel({
                   LOG
                 </Badge>
                 <h3 className="font-semibold text-sm">
-                  Activity Log for Run {viewingLog.id.slice(0, 8)}…
+                  Activity Log for Run {viewingLog.runNumber ? `#${viewingLog.runNumber}` : viewingLog.id.slice(0, 8)}
                 </h3>
               </div>
               <div className="flex items-center gap-2">
@@ -222,9 +223,9 @@ export function RunsPanel({
                         title={run.id}
                       >
                         <Send className="text-primary bg-primary/10 mr-2 p-1.5 rounded" />
-                        <span className="mr-1 font-bold">Run ID:</span>
-                        <span className="font-mono font-bold">
-                          {run.id.slice(0, 8)}…
+                        <span className="mr-1 font-bold">Run:</span>
+                        <span className="font-bold">
+                          {run.runNumber ? `#${run.runNumber}` : run.id.slice(0, 8)}
                         </span>
                       </span>
                       <Badge
@@ -341,7 +342,7 @@ export function RunsPanel({
                       variant="outline"
                       size="sm"
                       className="min-w-[140px] h-[34px] bg-inherit rounded-md gap-2 flex-1sm:flex-none hover:bg-primary hover:text-white"
-                      onClick={() => handleLoadLog(run.id)}
+                      onClick={() => handleLoadLog(run.id, run.runNumber)}
                       disabled={loadingLog}
                     >
                       <FileText className="h-3.5 w-3.5" /> View Log

@@ -19,6 +19,7 @@ export function useRuns(page: number, size: number) {
         elapsedSeconds: r.elapsed_seconds || 0,
         etaSeconds: r.eta_seconds || null,
         progressPct: r.progress_pct || 0,
+        runNumber: (r.run_number as number) || undefined,
       }));
       return {
         items,
@@ -51,6 +52,7 @@ export function useRun(runId: string | null) {
         elapsedSeconds: r.elapsed_seconds || 0,
         etaSeconds: r.eta_seconds || null,
         progressPct: r.progress_pct || 0,
+        runNumber: (r.run_number as number) || undefined,
       } as Run;
     },
     enabled: !!runId,
@@ -59,12 +61,14 @@ export function useRun(runId: string | null) {
 
 export interface RunTreeDirectory {
   run_id: string;
+  run_number?: number | null;
   path: string;
   count: number;
 }
 
 export interface RunIdItem {
   run_id: string;
+  run_number: number;
 }
 
 export interface RunTreeResponse {
