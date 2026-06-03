@@ -12,6 +12,7 @@ const defaultSettings: ProcessingSettings = {
   removePageNumbers: true,
   removeNumericValues: true,
   enableLemmatization: false,
+  applyTextFormatting: true,
 };
 
 interface UIState {

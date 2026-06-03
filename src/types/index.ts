@@ -48,6 +48,7 @@ export interface ProcessingSettings {
   removePageNumbers: boolean;
   removeNumericValues: boolean;
   enableLemmatization: boolean;
+  applyTextFormatting: boolean;
 }
 
 export interface LogEntry {

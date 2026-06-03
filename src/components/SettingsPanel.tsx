@@ -30,6 +30,11 @@ const toggleOptions: {
     label: "Remove Numeric Values",
     description: "Strip years, amounts, etc.",
   },
+  {
+    key: "applyTextFormatting",
+    label: "Apply Text Formatting",
+    description: "Fix hyphenation, unicode, newlines, and quotes",
+  },
 ];
 
 interface Props {
