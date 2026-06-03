@@ -72,7 +72,7 @@ export function SettingsPanel({
 
         <div className="py-4 border-b border-border/50 flex items-center gap-2">
           <Sliders className="h-4 w-4 text-primary" />
-          <h2 className="font-semibold text-sm">Advance Settings</h2>
+          <h2 className="font-semibold text-sm">Advanced Settings</h2>
         </div>
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-0.5">
@@ -84,6 +84,7 @@ export function SettingsPanel({
           <Switch
             checked={settings["enableLemmatization"] as boolean}
             onCheckedChange={(v) => onUpdate("enableLemmatization", v)}
+            disabled
             className="shrink-0 mt-0.5"
           />
         </div>

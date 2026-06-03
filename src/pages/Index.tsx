@@ -321,6 +321,7 @@ const Index = () => {
             ? selectedFilesPayload
             : null,
         force,
+        settings: store.settings,
       },
       {
         onSuccess: () => {
