@@ -33,6 +33,7 @@ export interface Run {
   elapsedSeconds: number;
   etaSeconds: number | null;
   progressPct: number;
+  runNumber?: number;
 }
 
 export interface PaginationState {
@@ -68,6 +69,8 @@ export interface ExtractionResult {
   page_count: number | null;
   processed_at: string | null;
   run_id: string | null;
+  run_number?: number | null;
+  txt_path?: string;
 }
 
 /** Full record returned by GET /api/v1/results/{id} — includes extracted text */
