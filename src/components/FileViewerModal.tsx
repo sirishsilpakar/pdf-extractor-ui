@@ -1,14 +1,10 @@
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Download, FileText } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Download, FileText, FolderOpen } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { ExtractionResultDetail } from "@/types";
 import { cn } from "@/lib/utils";
+import { formatChars, formatNumber, formatPercent } from "@/utils/number";
+import { formatDateTime } from "@/utils/date";
 
 interface Props {
   open: boolean;
@@ -18,17 +14,9 @@ interface Props {
   downloadUrl: string;
 }
 
-export function FileViewerModal({
-  open,
-  onOpenChange,
-  fileName,
-  detail,
-  downloadUrl,
-}: Props) {
+export function FileViewerModal({ open, onOpenChange, fileName, detail, downloadUrl }: Props) {
   const highConf =
-    detail?.confidence !== null &&
-    detail?.confidence !== undefined &&
-    detail.confidence >= 0.85;
+    detail?.confidence !== null && detail?.confidence !== undefined && detail.confidence >= 0.85;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -57,23 +45,16 @@ export function FileViewerModal({
               <span className="font-medium uppercase tracking-wider text-foreground/70">
                 {detail.method || "?"} EXTRACTION
               </span>
-              <span>{(detail.char_count || 0).toLocaleString()} chars</span>
-              {detail.page_count != null && (
-                <span>{detail.page_count} pages</span>
-              )}
+              <span>{formatChars(detail.char_count, "de-DE", true)}</span>
+              {detail.page_count != null && <span>{formatNumber(detail.page_count)} pages</span>}
               {detail.confidence != null && (
                 <span
-                  className={cn(
-                    "font-semibold",
-                    highConf ? "text-success" : "text-destructive",
-                  )}
+                  className={cn("font-semibold", highConf ? "text-success" : "text-destructive")}
                 >
-                  {(detail.confidence * 100).toFixed(1)}% confidence
+                  {formatPercent(detail.confidence)} confidence
                 </span>
               )}
-              {detail.processed_at && (
-                <span>{new Date(detail.processed_at).toLocaleString()}</span>
-              )}
+              {detail.processed_at && <span>{formatDateTime(detail.processed_at)}</span>}
             </div>
             <a
               href={downloadUrl}
