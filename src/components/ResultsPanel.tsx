@@ -24,6 +24,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { formatChars, formatPercent } from "@/utils/number";
+import { formatRelativeTime } from "@/utils/date";
 
 const FileRow = ({
   r,
@@ -41,6 +43,8 @@ const FileRow = ({
       .replace(/\.pdf$/i, "")
       .split("/")
       .pop() || r.filename;
+  const dt = formatRelativeTime(r.processed_at);
+  const confPct = formatPercent(r.confidence);
   const highConf = r.confidence !== null && r.confidence !== undefined && r.confidence >= 0.85;
 
   return (
@@ -73,7 +77,7 @@ const FileRow = ({
         </span>
       )}
       <span className="text-[11px] text-muted-foreground shrink-0 w-16 text-right">
-        {r.char_count}
+        {formatChars(r.char_count, "de-DE", true)}
       </span>
       {dt && (
         <span className="text-[11px] text-muted-foreground shrink-0 hidden lg:block opacity-60 w-16 text-right">
