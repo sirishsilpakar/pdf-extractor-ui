@@ -19,7 +19,7 @@ import {
 import type { Run, PaginationState } from "@/types";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
-import { formatDistanceToNow } from "date-fns"
+import { format } from "@/utils/format";
 
 interface Props {
   runs: Run[];
@@ -239,10 +239,7 @@ export function RunsPanel({
                       </Badge>
                     </div>
                     <span className="text-xs text-muted-foreground">
-                      {formatDistanceToNow(run.startedAt, {
-                        addSuffix: true,
-                        includeSeconds: true,
-                      })}
+                      {format.relativeTime(run.startedAt)}
                     </span>
                   </div>
 

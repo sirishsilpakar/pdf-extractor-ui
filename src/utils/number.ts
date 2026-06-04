@@ -66,7 +66,7 @@ export function formatNumber(
  * @param locale The locale used for formatting. Defaults to `"de-DE"`.
  * @param options Additional `Intl.NumberFormat` options that override
  * the default compact formatting configuration.
- * 
+ *
  * @returns A compact localized number string, or `null` if the input is invalid.
  */
 export function formatNumCompact(
@@ -91,7 +91,7 @@ export function formatNumCompact(
  * @param value The number of characters to format.
  * @param locale The locale used for formatting. Defaults to `"de-DE"`.
  * @param compact Whether to use compact number formatting. Defaults to `true`.
- * 
+ *
  * @returns A localized character count string (e.g. "1.2K chars"), or `null`
  * if the input is invalid.
  */
@@ -105,4 +105,18 @@ export function formatChars(
   const formatted = compact ? formatNumCompact(value, locale) : formatNumber(value, locale);
 
   return formatted ? `${formatted} char${formatted.length > 1 ? "s" : ""}` : null;
+}
+
+/**
+ * Formats a file size in bytes into a readable string using
+ * B, KB, or MB units with one decimal place for KB and MB values.
+ *
+ * @param bytes - The file size in bytes.
+ *
+ * @returns A formatted file size string (e.g., "512 B", "1.5 KB", "3.2 MB").
+ */
+export function formatFileSize(bytes: number) {
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + " KB";
+  return (bytes / 1048576).toFixed(1) + " MB";
 }

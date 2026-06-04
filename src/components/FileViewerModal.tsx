@@ -3,8 +3,7 @@ import { Download, FileText, FolderOpen } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { ExtractionResultDetail } from "@/types";
 import { cn } from "@/lib/utils";
-import { formatChars, formatNumber, formatPercent } from "@/utils/number";
-import { formatDateTime } from "@/utils/date";
+import { format } from "@/utils/format";
 
 interface Props {
   open: boolean;
@@ -45,24 +44,18 @@ export function FileViewerModal({ open, onOpenChange, fileName, detail, download
               <span className="font-medium uppercase tracking-wider text-foreground/70">
                 {detail.method || "?"} EXTRACTION
               </span>
-              <span>{formatChars(detail.char_count, "de-DE", true)}</span>
-              {detail.page_count != null && <span>{formatNumber(detail.page_count)} pages</span>}
+              <span>{format.chars(detail.char_count)}</span>
+              {detail.page_count != null && <span>{format.number(detail.page_count)} pages</span>}
               {detail.confidence != null && (
                 <span
                   className={cn("font-semibold", highConf ? "text-success" : "text-destructive")}
                 >
-                  {formatPercent(detail.confidence)} confidence
+                  {format.percent(detail.confidence)} confidence
                 </span>
               )}
-              {detail.processed_at && <span>{formatDateTime(detail.processed_at)}</span>}
+              {detail.processed_at && <span>{format.dateTime(detail.processed_at)}</span>}
             </div>
-            <a
-              href={downloadUrl}
-              download
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors mr-8 shrink-0 hover:text-primary"
-            >
-              <Download className="h-3.5 w-3.5" /> Download .txt
-            </a>
+            <div className="flex items-center gap-2 mr-8 shrink-0">
           </div>
         )}
 
@@ -72,9 +65,7 @@ export function FileViewerModal({ open, onOpenChange, fileName, detail, download
             {!detail ? (
               <div className="flex flex-col items-center justify-center h-40 gap-3 text-muted-foreground">
                 <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-                <p className="text-sm font-medium">
-                  Loading extracted content…
-                </p>
+                <p className="text-sm font-medium">Loading extracted content...</p>
               </div>
             ) : detail.content ? (
               <pre className="text-sm font-mono whitespace-pre-wrap break-words leading-relaxed text-foreground/90 selection:bg-primary/20">
