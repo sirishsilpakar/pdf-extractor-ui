@@ -299,10 +299,12 @@ export function ResultsPanel({ runFilter, onRunFilterChange, onGetDetail, getDow
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-1 shrink-0">
         <div className="flex items-center gap-2">
           <ClipboardList className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold tracking-tight">Extracted Files</h2>
-          <span className="text-xs text-muted-foreground font-medium bg-secondary/60 px-2 py-0.5 rounded-full">
-            {pagination.total} files
-          </span>
+          <h2 className="text-lg font-semibold tracking-tight leading-none">Extracted Files</h2>
+          {tree?.total && (
+            <span className="text-xs text-muted-foreground font-medium bg-secondary px-2 py-0.5 rounded-full leading-none">
+              {tree?.total} files
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
