@@ -64,6 +64,7 @@ export interface RunTreeDirectory {
   run_number?: number | null;
   path: string;
   count: number;
+  has_duplicate?: boolean;
 }
 
 export interface RunIdItem {
@@ -79,6 +80,7 @@ export interface RunTreeResponse {
   page: number;
   size: number;
   pages: number;
+  total: number;
 }
 
 export function useRunTree(runId: string | null, page: number = 1, size: number = 50) {

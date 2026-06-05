@@ -256,23 +256,7 @@ export function ResultsPanel({ runFilter, onRunFilterChange, onGetDetail, getDow
     setTreePage(1);
   }, [runFilter]);
 
-  const { data: tree, isLoading, refetch } = useRunTree(runFilter, treePage, 10);
-
-  const directoryDuplicates = useMemo(() => {
-    const counts: Record<string, number> = {};
-    tree?.directories.forEach((dir) => {
-      counts[dir.path] = (counts[dir.path] || 0) + 1;
-    });
-    return counts;
-  }, [tree?.directories]);
-
-  const fileDuplicates = useMemo(() => {
-    const counts: Record<string, number> = {};
-    tree?.top_level_files.forEach((file) => {
-      counts[file.rel_path] = (counts[file.rel_path] || 0) + 1;
-    });
-    return counts;
-  }, [tree?.top_level_files]);
+  const { data: tree, isLoading, refetch } = useRunTree(runFilter, treePage, 20);
 
   const handleView = async (result: ExtractionResult) => {
     setViewingResult(result);
@@ -388,7 +372,7 @@ export function ResultsPanel({ runFilter, onRunFilterChange, onGetDetail, getDow
                 count={dir.count}
                 onView={handleView}
                 getDownloadUrl={getDownloadUrl}
-                showRunInfo={directoryDuplicates[dir.path] > 1}
+                showRunInfo={!!dir.has_duplicate}
               />
             ))}
 
@@ -400,7 +384,7 @@ export function ResultsPanel({ runFilter, onRunFilterChange, onGetDetail, getDow
                     r={file}
                     onView={handleView}
                     getDownloadUrl={getDownloadUrl}
-                    showRunInfo={fileDuplicates[file.rel_path] > 1}
+                    showRunInfo={!!file.has_duplicate}
                   />
                 ))}
               </div>
