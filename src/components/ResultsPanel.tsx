@@ -47,7 +47,7 @@ const FileRow = ({
   const highConf = r.confidence !== null && r.confidence !== undefined && r.confidence >= 0.85;
 
   return (
-    <div className="flex items-center gap-3 px-10 py-2 hover:bg-secondary/20 transition-colors group h-[52px]">
+    <div className="flex items-center gap-3 pl-4 pr-6 py-2 hover:bg-secondary/20 transition-colors group h-[52px]">
       <span
         className="flex-1 text-sm font-medium truncate flex items-center gap-2"
         title={r.rel_path}
@@ -187,7 +187,7 @@ const DirectoryItem = ({
 
           <div
             ref={parentRef}
-            className="max-h-[240px] overflow-y-auto no-scrollbar"
+            className="max-h-[240px] overflow-y-auto pl-6 border-l border-border/10 ml-8 mr-2 py-1"
             onScroll={handleScroll}
           >
             <div

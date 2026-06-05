@@ -71,6 +71,7 @@ export interface ExtractionResult {
   run_id: string | null;
   run_number?: number | null;
   txt_path?: string;
+  has_duplicate?: boolean;
 }
 
 /** Full record returned by GET /api/v1/results/{id} — includes extracted text */
