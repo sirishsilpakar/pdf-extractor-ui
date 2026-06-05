@@ -142,3 +142,22 @@ export interface SSEFileProgressEvent {
 }
 
 export type SSEEvent = SSEStateUpdateEvent | SSELogEvent | SSEFileProgressEvent;
+
+export interface ResultTreeDirectory {
+  run_id: string;
+  run_number?: number | null;
+  path: string;
+  count: number;
+  has_duplicate?: boolean;
+}
+
+export interface ResultTreeResponse {
+  directories: ResultTreeDirectory[];
+  directories_total: number;
+  top_level_files: ExtractionResult[];
+  top_level_files_total: number;
+  page: number;
+  size: number;
+  pages: number;
+  total: number;
+}

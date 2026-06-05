@@ -66,11 +66,6 @@ const Index = () => {
     store.skipProcessedFiles
   );
   const { data: runsData, isPending: isRunsLoading } = useRuns(runsPage, 10);
-  const {
-    data: resultsData,
-    isPending: isResultsLoading,
-    refetch: refetchResults,
-  } = useResults(store.resultsRunFilter, resultsPage, 10);
   const { data: searchData, isPending: isSearchLoading } = useSearch(
     store.searchQuery,
     searchPage,

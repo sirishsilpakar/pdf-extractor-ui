@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,10 +12,13 @@ import {
   X,
   Loader2,
 } from "lucide-react";
-import type { ExtractionResult, ExtractionResultDetail, PaginationState, Run } from "@/types";
+import type { ExtractionResult, ExtractionResultDetail } from "@/types";
 import { cn } from "@/lib/utils";
 import { FileViewerModal } from "./FileViewerModal";
-import { useRunTree, useRunFiles, useAllRunIds, useRun } from "@/hooks/queries/useRuns";
+import { useAllRunIds } from "@/hooks/queries/useRuns";
+import { useResultTree, useResultDirectoryFiles } from "@/hooks/queries/useResults";
+
+import { useQueryClient } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   Select,
@@ -124,11 +127,8 @@ const DirectoryItem = ({
   showRunInfo?: boolean;
 }) => {
   const [expanded, setExpanded] = useState(false);
-  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = useRunFiles(
-    expanded ? runId : null,
-    directory,
-    5,
-  );
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } =
+    useResultDirectoryFiles(expanded ? runId : null, directory, 5);
 
   const allItems = data ? data.pages.flatMap((p) => p.items) : [];
 
@@ -243,6 +243,8 @@ export function ResultsPanel({ runFilter, onRunFilterChange, onGetDetail, getDow
   const [viewingDetail, setViewingDetail] = useState<ExtractionResultDetail | null>(null);
   const [treePage, setTreePage] = useState(1);
 
+  const queryClient = useQueryClient();
+
   const {
     data: fetchedRunIdsData,
     fetchNextPage,
@@ -256,7 +258,11 @@ export function ResultsPanel({ runFilter, onRunFilterChange, onGetDetail, getDow
     setTreePage(1);
   }, [runFilter]);
 
-  const { data: tree, isLoading, refetch } = useRunTree(runFilter, treePage, 20);
+  const { data: tree, isLoading } = useResultTree(runFilter, treePage, 20);
+
+  const directories = tree?.directories ?? [];
+  const files = tree?.topLevelFiles ?? [];
+  const { page, pages, total } = tree?.pagination ?? {};
 
   const handleView = async (result: ExtractionResult) => {
     setViewingResult(result);
@@ -275,7 +281,7 @@ export function ResultsPanel({ runFilter, onRunFilterChange, onGetDetail, getDow
             setViewingDetail(null);
           }
         }}
-        fileName={viewingResult?.filename || ""}
+        fileName={viewingResult?.filename ?? ""}
         detail={viewingDetail}
         downloadUrl={viewingResult ? getDownloadUrl(viewingResult.id) : ""}
       />
@@ -284,9 +290,9 @@ export function ResultsPanel({ runFilter, onRunFilterChange, onGetDetail, getDow
         <div className="flex items-center gap-2">
           <ClipboardList className="h-5 w-5 text-primary" />
           <h2 className="text-lg font-semibold tracking-tight leading-none">Extracted Files</h2>
-          {tree?.total && (
+          {total && (
             <span className="text-xs text-muted-foreground font-medium bg-secondary px-2 py-0.5 rounded-full leading-none">
-              {tree?.total} files
+              {total} files
             </span>
           )}
         </div>
@@ -363,7 +369,7 @@ export function ResultsPanel({ runFilter, onRunFilterChange, onGetDetail, getDow
           ))
         ) : (
           <div className="glass rounded-2xl overflow-hidden border border-border/50 flex flex-col divide-y divide-border/30">
-            {tree?.directories.map((dir) => (
+            {directories.map((dir) => (
               <DirectoryItem
                 key={`${dir.run_id}-${dir.path}`}
                 runId={dir.run_id}
@@ -376,9 +382,9 @@ export function ResultsPanel({ runFilter, onRunFilterChange, onGetDetail, getDow
               />
             ))}
 
-            {tree?.top_level_files && tree.top_level_files.length > 0 && (
+            {files && files.length > 0 && (
               <div className="divide-y divide-border/10 bg-background/20">
-                {tree.top_level_files.map((file) => (
+                {files.map((file) => (
                   <FileRow
                     key={file.id}
                     r={file}
@@ -390,7 +396,7 @@ export function ResultsPanel({ runFilter, onRunFilterChange, onGetDetail, getDow
               </div>
             )}
 
-            {tree && tree.directories.length === 0 && tree.top_level_files.length === 0 && (
+            {directories.length === 0 && files.length === 0 && (
               <div className="p-12 flex flex-col items-center justify-center gap-4">
                 <ClipboardList className="h-8 w-8 text-muted-foreground opacity-50" />
                 <p className="font-medium text-muted-foreground">No extracted files found.</p>
@@ -398,17 +404,17 @@ export function ResultsPanel({ runFilter, onRunFilterChange, onGetDetail, getDow
             )}
 
             {/* Pagination */}
-            {tree && tree.pages > 1 && (
+            {pages > 1 && (
               <div className="flex items-center justify-between p-4">
                 <p className="text-xs text-muted-foreground">
-                  Showing page {tree.page} of {tree.pages}
+                  Showing page {page} of {pages}
                 </p>
                 <div className="flex items-center gap-2">
                   <Button
                     variant="outline"
                     size="sm"
                     className="rounded-xl"
-                    disabled={tree.page <= 1}
+                    disabled={page <= 1}
                     onClick={() => setTreePage((p) => Math.max(1, p - 1))}
                   >
                     Previous
@@ -417,7 +423,7 @@ export function ResultsPanel({ runFilter, onRunFilterChange, onGetDetail, getDow
                     variant="outline"
                     size="sm"
                     className="rounded-xl"
-                    disabled={tree.page >= tree.pages}
+                    disabled={page >= pages}
                     onClick={() => setTreePage((p) => p + 1)}
                   >
                     Next
