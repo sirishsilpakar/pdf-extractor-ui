@@ -11,9 +11,19 @@ interface Props {
   fileName: string;
   detail: ExtractionResultDetail | null;
   downloadUrl: string;
+  isLoading?: boolean;
+  isError?: boolean;
 }
 
-export function FileViewerModal({ open, onOpenChange, fileName, detail, downloadUrl }: Props) {
+export function FileViewerModal({
+  open,
+  onOpenChange,
+  fileName,
+  detail,
+  downloadUrl,
+  isLoading,
+  isError,
+}: Props) {
   const highConf =
     detail?.confidence !== null && detail?.confidence !== undefined && detail.confidence >= 0.85;
 
@@ -62,12 +72,16 @@ export function FileViewerModal({ open, onOpenChange, fileName, detail, download
         {/* Body */}
         <ScrollArea className="flex-1 bg-secondary/10">
           <div className="px-8 py-4">
-            {!detail ? (
-              <div className="flex flex-col items-center justify-center h-40 gap-3 text-muted-foreground">
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center h-[50vh] gap-3 text-muted-foreground">
                 <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
                 <p className="text-sm font-medium">Loading extracted content...</p>
               </div>
-            ) : detail.content ? (
+            ) : isError ? (
+              <div className="flex flex-col items-center justify-center h-[50vh] gap-2 text-destructive">
+                <p className="text-sm font-semibold">File not found</p>
+              </div>
+            ) : detail?.content ? (
               <pre className="text-sm font-mono whitespace-pre-wrap break-words leading-relaxed text-foreground/90 selection:bg-primary/20">
                 {detail.content}
               </pre>

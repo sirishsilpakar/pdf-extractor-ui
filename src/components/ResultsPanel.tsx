@@ -241,6 +241,8 @@ interface Props {
 export function ResultsPanel({ runFilter, onRunFilterChange, onGetDetail, getDownloadUrl }: Props) {
   const [viewingResult, setViewingResult] = useState<ExtractionResult | null>(null);
   const [viewingDetail, setViewingDetail] = useState<ExtractionResultDetail | null>(null);
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
+  const [detailError, setDetailError] = useState(false);
   const [treePage, setTreePage] = useState(1);
 
   const queryClient = useQueryClient();
@@ -267,8 +269,21 @@ export function ResultsPanel({ runFilter, onRunFilterChange, onGetDetail, getDow
   const handleView = async (result: ExtractionResult) => {
     setViewingResult(result);
     setViewingDetail(null);
-    const detail = await onGetDetail(result.id);
-    setViewingDetail(detail);
+    setIsLoadingDetail(true);
+    setDetailError(false);
+    try {
+      const detail = await onGetDetail(result.id);
+      if (detail) {
+        setViewingDetail(detail);
+      } else {
+        setDetailError(true);
+      }
+    } catch (e) {
+      console.error("Failed to load result text detail", e);
+      setDetailError(true);
+    } finally {
+      setIsLoadingDetail(false);
+    }
   };
 
   return (
@@ -279,10 +294,14 @@ export function ResultsPanel({ runFilter, onRunFilterChange, onGetDetail, getDow
           if (!open) {
             setViewingResult(null);
             setViewingDetail(null);
+            setIsLoadingDetail(false);
+            setDetailError(false);
           }
         }}
         fileName={viewingResult?.filename ?? ""}
         detail={viewingDetail}
+        isLoading={isLoadingDetail}
+        isError={detailError}
         downloadUrl={viewingResult ? getDownloadUrl(viewingResult.id) : ""}
       />
 
