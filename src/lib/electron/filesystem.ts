@@ -18,7 +18,7 @@ export function isElectronAvailable(): boolean {
 export function showInFolder(filePath: string) {
   if (!isElectronAvailable()) return;
 
-  window.electronAPI.showItemInFolder(normalizePath(filePath));
+  window.electronAPI.showItemInFolder(filePath);
 }
 
 /**

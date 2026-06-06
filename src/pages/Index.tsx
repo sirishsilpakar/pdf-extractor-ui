@@ -34,7 +34,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FolderOpen, Trash2, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { electron } from "@/lib/electron";
+import { isElectronAvailable, openFolder } from "@/lib/electron";
 
 const Index = () => {
   const store = useAppStore();
@@ -638,11 +638,11 @@ const Index = () => {
                           dirError && "border-destructive focus-visible:ring-destructive"
                         )}
                       />
-                      {electron.isAvailable() && (
+                      {isElectronAvailable() && (
                         <Button
                           variant="secondary"
                           onClick={async () => {
-                            const selectedPath = await window.electronAPI.openFolder();
+                            const selectedPath = await openFolder();
                             if (selectedPath) {
                               store.setExtractionOutputDir(selectedPath);
                               const res = await handleValidateDir(selectedPath);

@@ -218,10 +218,7 @@ export function RunsPanel({
               };
 
               return (
-                <div
-                  key={run.id}
-                  className="rounded-2xl border border-border p-4 space-y-3"
-                >
+                <div key={run.id} className="rounded-2xl border border-border p-4 space-y-3">
                   {/* Card header */}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-6">
@@ -231,9 +228,7 @@ export function RunsPanel({
                       >
                         <Send className="text-primary bg-primary/10 mr-2 p-1.5 rounded" />
                         <span className="mr-1 font-bold">Run ID:</span>
-                        <span className="font-mono font-bold">
-                          {run.id.slice(0, 8)}…
-                        </span>
+                        <span className="font-mono font-bold">{run.id.slice(0, 8)}…</span>
                       </span>
                       <Badge
                         className={cn(
@@ -241,7 +236,7 @@ export function RunsPanel({
                           statusInfo.color,
                         )}
                       >
-                        {statusInfo.icon ? statusInfo.icon : "" }
+                        {statusInfo.icon ? statusInfo.icon : ""}
                         {statusInfo.label}
                       </Badge>
                     </div>
@@ -259,44 +254,55 @@ export function RunsPanel({
                       {
                         label: "Duration",
                         value: fmtDuration(run.elapsedSeconds),
-                        icon: <Clock4 height={40} width={40} className="text-primary rounded-sm bg-primary/10 mr-2 p-2"/>,
+                        icon: (
+                          <Clock4
+                            height={40}
+                            width={40}
+                            className="text-primary rounded-sm bg-primary/10 mr-2 p-2"
+                          />
+                        ),
                       },
                       {
                         label: "Files",
                         value: `${run.completedFiles} / ${total}`,
                         sub: failed > 0 ? `${failed} failed` : undefined,
-                        icon: <FileMinus height={40} width={40} className="text-primary rounded-sm bg-primary/10 mr-2 p-2"/>,
+                        icon: (
+                          <FileMinus
+                            height={40}
+                            width={40}
+                            className="text-primary rounded-sm bg-primary/10 mr-2 p-2"
+                          />
+                        ),
                       },
-                      { 
-                        label: "Direct", 
+                      {
+                        label: "Direct",
                         value: String(direct),
-                        icon: <FolderDown height={40} width={40} className="text-primary rounded-sm bg-primary/10 mr-2 p-2"/>,
+                        icon: (
+                          <FolderDown
+                            height={40}
+                            width={40}
+                            className="text-primary rounded-sm bg-primary/10 mr-2 p-2"
+                          />
+                        ),
                       },
-                      { 
+                      {
                         label: "OCR",
                         value: String(ocr),
-                        icon: <ScanLine height={40} width={40} className="text-amber-500 rounded-sm bg-amber-500/10 mr-2 p-2"/>,
+                        icon: (
+                          <ScanLine
+                            height={40}
+                            width={40}
+                            className="text-amber-500 rounded-sm bg-amber-500/10 mr-2 p-2"
+                          />
+                        ),
                       },
                     ].map((s) => (
-                      <div
-                        key={s.label}
-                        className="bg-secondary/40 rounded-xl p-3 flex"
-                      >
-                        <div className="mr-2">
-                          {s.icon}
-                        </div>
+                      <div key={s.label} className="bg-secondary/40 rounded-xl p-3 flex">
+                        <div className="mr-2">{s.icon}</div>
                         <div>
-                          <p className="text-[10px] text-muted-foreground">
-                            {s.label}
-                          </p>
-                          <p className="font-bold text-lg">
-                            {s.value}
-                          </p>
-                          {s.sub && (
-                            <p className="text-[10px] text-destructive mt-0.5">
-                              {s.sub}
-                            </p>
-                          )}
+                          <p className="text-[10px] text-muted-foreground">{s.label}</p>
+                          <p className="font-bold text-lg">{s.value}</p>
+                          {s.sub && <p className="text-[10px] text-destructive mt-0.5">{s.sub}</p>}
                         </div>
                       </div>
                     ))}
@@ -307,23 +313,20 @@ export function RunsPanel({
                     <div className="flex justify-between text-[10px] font-medium px-0.5">
                       <div className="flex gap-8">
                         <span className="text-blue-500 flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />{" "}
-                          Direct {directPct}%
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-600" /> Direct{" "}
+                          {directPct}%
                         </span>
                         <span className="text-amber-500 flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />{" "}
-                          OCR {ocrPct}%
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" /> OCR {ocrPct}%
                         </span>
                         {failedPct > 0 && (
                           <span className="text-destructive flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-destructive" />{" "}
-                            Failed {failedPct}%
+                            <span className="w-1.5 h-1.5 rounded-full bg-destructive" /> Failed{" "}
+                            {failedPct}%
                           </span>
                         )}
                       </div>
-                      <span className="text-muted-foreground">
-                        Total {total} files
-                      </span>
+                      <span className="text-muted-foreground">Total {total} files</span>
                     </div>
                     <div className="h-2 rounded-full bg-secondary/60 overflow-hidden flex shadow-inner">
                       <div

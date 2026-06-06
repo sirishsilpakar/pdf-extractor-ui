@@ -27,7 +27,7 @@ ipcMain.handle("open-path", async (event, folderPath) => {
 
 ipcMain.handle("show-item-in-folder", async (event, filePath) => {
   if (filePath) {
-    shell.showItemInFolder(filePath);
+    shell.showItemInFolder(path.normalize(filePath));
   }
 });
 
