@@ -346,7 +346,9 @@ export function ResultsPanel({ runFilter, onRunFilterChange, onGetDetail, getDow
           <Button
             variant="outline"
             size="sm"
-            onClick={() => refetch()}
+            onClick={() => {
+              queryClient.invalidateQueries({ queryKey: ["results"] });
+            }}
             className="gap-2 rounded-xl h-8 hover:bg-primary hover:text-white"
           >
             <RefreshCw className="h-4 w-4" /> Refresh
