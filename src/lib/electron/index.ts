@@ -1,1 +1,1 @@
-export { isElectronAvailable, showInFolder, openPath } from "./filesystem";
+export { isElectronAvailable, openFile, openFolder, openPath, showInFolder } from "./filesystem";

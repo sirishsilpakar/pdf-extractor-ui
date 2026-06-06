@@ -32,3 +32,27 @@ export function openPath(path: string) {
 
   window.electronAPI.openPath(path);
 }
+
+/**
+ * Opens a native folder selection dialog and returns the selected folder path
+ * Requires Electron environment; returns `undefined` if unavailable
+ *
+ * @returns A promise resolving to the selected folder path, or `undefined` if Electron is not available
+ */
+export async function openFolder(): Promise<string | undefined> {
+  if (!isElectronAvailable()) return;
+
+  return window.electronAPI.openFolder();
+}
+
+/**
+ * Opens a native file picker dialog and returns the selected file path
+ * Requires Electron environment; returns `undefined` if Electron is not available
+ *
+ * @returns A promise resolving to the selected file path, or `undefined` if Electron is not available
+ */
+export async function openFile(): Promise<string | undefined> {
+  if (!isElectronAvailable()) return;
+
+  return window.electronAPI.openFile();
+}

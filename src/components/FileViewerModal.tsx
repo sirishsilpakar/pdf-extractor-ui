@@ -4,10 +4,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Download, FileText } from "lucide-react";
+import { Download, FileText, FolderOpen } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { ExtractionResultDetail } from "@/types";
+import { isElectronAvailable, showInFolder } from "@/lib/electron";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -75,13 +75,23 @@ export function FileViewerModal({
                 <span>{new Date(detail.processed_at).toLocaleString()}</span>
               )}
             </div>
-            <a
-              href={downloadUrl}
-              download
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors mr-8 shrink-0 hover:text-primary"
-            >
-              <Download className="h-3.5 w-3.5" /> Download .txt
-            </a>
+            <div className="flex items-center gap-2 mr-8 shrink-0">
+              {isElectronAvailable() && detail.txt_path && (
+                <button
+                  onClick={() => showInFolder(detail.txt_path!)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors hover:text-primary text-muted-foreground"
+                >
+                  <FolderOpen className="h-3.5 w-3.5" /> Show in Folder
+                </button>
+              )}
+              <a
+                href={downloadUrl}
+                download
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors hover:text-primary text-muted-foreground"
+              >
+                <Download className="h-3.5 w-3.5" /> Download .txt
+              </a>
+            </div>
           </div>
         )}
 
