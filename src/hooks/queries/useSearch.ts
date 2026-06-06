@@ -43,7 +43,10 @@ export function useReindexSearch() {
     mutationFn: () => fetcher("/search/reindex", { method: "POST" }),
     onSuccess: () => {
       // Could invalidate search queries, though reindex takes time
-      queryClient.invalidateQueries({ queryKey: ["search"] });
-    },
+      // For now use 5 seconds delay
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["search"] })
+      }, 5000);
+    }
   });
 }

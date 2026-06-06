@@ -65,7 +65,7 @@ export function FileViewerModal({
               )}
               {detail.processed_at && <span>{format.dateTime(detail.processed_at)}</span>}
             </div>
-            <div className="flex items-center gap-2 mr-8 shrink-0">
+            <div className="flex items-center gap-2 mr-8 shrink-0"></div>
           </div>
         )}
 
