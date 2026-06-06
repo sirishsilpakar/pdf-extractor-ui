@@ -36,6 +36,8 @@ interface SelectionState {
 interface SettingsState {
   settings: ProcessingSettings;
   updateSetting: <K extends keyof ProcessingSettings>(key: K, value: ProcessingSettings[K]) => void;
+  extractionOutputDir: string;
+  setExtractionOutputDir: (path: string) => void;
 }
 
 interface LogState {
@@ -113,9 +115,18 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // Settings State
   settings: defaultSettings,
-  updateSetting: (key, value) => set((state) => ({
-    settings: { ...state.settings, [key]: value },
-  })),
+  updateSetting: (key, value) =>
+    set((state) => ({
+      settings: { ...state.settings, [key]: value },
+    })),
+  extractionOutputDir:
+    typeof window !== "undefined" ? localStorage.getItem("extractionOutputDir") || "" : "",
+  setExtractionOutputDir: (path) => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("extractionOutputDir", path);
+    }
+    set({ extractionOutputDir: path });
+  },
 
   // Log State
   logs: [],

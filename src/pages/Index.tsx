@@ -30,6 +30,11 @@ import { useSearch, useReindexSearch } from "@/hooks/queries/useSearch";
 import { API_BASE, BATCH_SSE_URL, fetcher } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 import { FilesListItem, NavView, PaginationState } from "@/types";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { FolderOpen, Trash2, Info } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { electron } from "@/lib/electron";
 
 const Index = () => {
   const store = useAppStore();
@@ -58,7 +63,6 @@ const Index = () => {
   }, [])
 
   // Queries
-  const { data: jobStatus } = useJobStatus();
   const { data: jobFiles, isPending: isFilesLoading } = useJobFiles(
     filesPage,
     10,
@@ -114,6 +118,35 @@ const Index = () => {
   const { mutate: cancelJob } = useCancelJob();
   const { mutate: startJob } = useStartJob();
   const { mutate: reindexSearch } = useReindexSearch();
+
+  const [dirError, setDirError] = useState<string | null>(null);
+
+  const handleValidateDir = async (
+    path: string,
+    showToast = true,
+  ): Promise<{ ok: boolean; error?: string }> => {
+    if (!path.trim()) {
+      setDirError(null);
+      return { ok: true };
+    }
+    try {
+      await fetcher("/job/validate-directory", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path }),
+      });
+      setDirError(null);
+      return { ok: true };
+    } catch (err: any) {
+      setDirError(err.message);
+      if (showToast) {
+        toast.error("Directory not writable", {
+          description: err.message,
+        });
+      }
+      return { ok: false, error: err.message };
+    }
+  };
 
   // After we get job status done from Batch processing stream
   const pendingFiles = useMemo(() => {
@@ -547,12 +580,99 @@ const Index = () => {
             )}
 
             {store.currentView === "settings" && (
-              <div className="glass rounded-2xl p-6">
-                <h2 className="font-semibold mb-4 text-lg">System Settings</h2>
-                <div className="space-y-4">
-                  <p className="text-sm text-muted-foreground">
-                    Configure the PDF extraction pipeline settings in the panel
-                    on the right.
+              <div className="glass rounded-2xl p-6 space-y-6">
+                <div>
+                  <h2 className="font-semibold text-lg flex items-center gap-2">
+                    <span className="p-1.5 rounded-lg bg-primary/10 text-primary">
+                      <FolderOpen className="h-5 w-5" />
+                    </span>
+                    Extraction Output Directory
+                  </h2>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Configure where the extracted text files will be saved on your system.
+                  </p>
+                </div>
+
+                <div className="space-y-4 max-w-2xl bg-secondary/20 p-4 rounded-xl border border-border/40">
+                  <div className="flex items-start gap-2.5 text-xs text-muted-foreground">
+                    <Info className="h-4 w-4 shrink-0 text-primary mt-0.5" />
+                    <div>
+                      <p className="font-medium text-foreground">Storage Resolution</p>
+                      <p className="mt-0.5 text-muted-foreground">
+                        If left blank, files will be saved to the default <code className="px-1.5 py-0.5 rounded bg-secondary-foreground/10 text-foreground font-mono">extracted_files</code> directory.
+                        Providing an absolute path will write files directly to that folder.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
+                      Target Folder Path
+                    </label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="text"
+                        placeholder="e.g. /Users/username/extracted_files"
+                        value={store.extractionOutputDir}
+                        onChange={(e) => {
+                          store.setExtractionOutputDir(e.target.value);
+                          if (dirError) setDirError(null);
+                        }}
+                        onBlur={async (e) => {
+                          await handleValidateDir(e.target.value);
+                        }}
+                        className={cn(
+                          "font-mono text-sm bg-background/50",
+                          dirError && "border-destructive focus-visible:ring-destructive"
+                        )}
+                      />
+                      {electron.isAvailable() && (
+                        <Button
+                          variant="secondary"
+                          onClick={async () => {
+                            const selectedPath = await window.electronAPI.openFolder();
+                            if (selectedPath) {
+                              store.setExtractionOutputDir(selectedPath);
+                              const res = await handleValidateDir(selectedPath);
+                              if (res.ok) {
+                                toast.success("Output directory updated", {
+                                  description: selectedPath,
+                                });
+                              }
+                            }
+                          }}
+                          className="gap-1.5 shrink-0"
+                        >
+                          <FolderOpen className="h-4 w-4" />
+                          Select
+                        </Button>
+                      )}
+                      {store.extractionOutputDir && (
+                        <Button
+                          variant="ghost"
+                          onClick={() => {
+                            store.setExtractionOutputDir("");
+                            setDirError(null);
+                            toast.success("Reset to default output directory");
+                          }}
+                          className="shrink-0 text-muted-foreground hover:text-destructive"
+                          title="Reset to default"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                    {dirError && (
+                      <p className="text-xs text-destructive font-medium mt-1">
+                        {dirError}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="border-t border-border/50 pt-4">
+                  <p className="text-xs text-muted-foreground">
+                    Other processing settings (like header/footer removal) are configured using the control panel on the right.
                   </p>
                 </div>
               </div>
