@@ -6,7 +6,13 @@ export function useRuns(page: number, size: number) {
   return useQuery({
     queryKey: ["runs", page, size],
     queryFn: async () => {
-      const data = await fetcher<{ items: Record<string, unknown>[]; page: number; size: number; total: number; pages: number }>(`/runs?page=${page}&size=${size}`);
+      const data = await fetcher<{
+        items: Record<string, unknown>[];
+        page: number;
+        size: number;
+        total: number;
+        pages: number;
+      }>(`/runs?page=${page}&size=${size}`);
       const items: Run[] = data.items.map((r: Record<string, unknown>) => ({
         id: r.run_id || r.id || String(Math.random()),
         status: r.status || "unknown",
@@ -15,10 +21,11 @@ export function useRuns(page: number, size: number) {
         failedFiles: r.failed_files || 0,
         directFiles: r.direct_files || 0,
         ocrFiles: r.ocr_files || 0,
-        startedAt: r.started_at ? new Date(r.started_at) : new Date(),
+        startedAt: r.started_at ? new Date(r.started_at as string) : new Date(),
         elapsedSeconds: r.elapsed_seconds || 0,
         etaSeconds: r.eta_seconds || null,
         progressPct: r.progress_pct || 0,
+        outputDir: (r.output_dir as string) || undefined,
       }));
       return {
         items,

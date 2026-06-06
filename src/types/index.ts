@@ -33,6 +33,7 @@ export interface Run {
   elapsedSeconds: number;
   etaSeconds: number | null;
   progressPct: number;
+  outputDir?: string;
 }
 
 export interface PaginationState {
@@ -73,6 +74,7 @@ export interface ExtractionResult {
 /** Full record returned by GET /api/v1/results/{id} — includes extracted text */
 export interface ExtractionResultDetail extends ExtractionResult {
   content: string;
+  txt_path: string;
 }
 
 /** Search result returned by GET /api/v1/search — snippet already has <mark> tags */

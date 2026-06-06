@@ -256,6 +256,17 @@ const Index = () => {
     force = false,
     skipDuplicates = false,
   ) => {
+    // Validate output directory before starting job
+    if (store.extractionOutputDir) {
+      const validation = await handleValidateDir(store.extractionOutputDir, false);
+      if (!validation.ok) {
+        toast.error("Fix the output directory in settings", {
+          description: validation.error || "The target folder is not writable.",
+        });
+        return;
+      }
+    }
+
     // 0. Duplicate Check
     if (!force && !skipDuplicates) {
       const hashes = store.pendingFiles
@@ -354,6 +365,7 @@ const Index = () => {
             ? selectedFilesPayload
             : null,
         force,
+        output_dir: store.extractionOutputDir ?? "",
       },
       {
         onSuccess: () => {
