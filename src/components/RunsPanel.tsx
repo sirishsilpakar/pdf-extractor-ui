@@ -14,9 +14,12 @@ import {
   ScanLine,
   TriangleAlert,
   Ban,
-  FileCog
+  FileCog,
+  FolderOpen
 } from "lucide-react";
 import type { Run, PaginationState } from "@/types";
+import { isElectronAvailable, openPath } from "../lib/electron";
+import { ensureChildDir } from "@/lib/fs";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { formatDistanceToNow } from "date-fns"
@@ -36,6 +39,11 @@ function fmtDuration(secs: number) {
   if (s < 60) return `${s}s`;
   if (s < 3600) return `${Math.floor(s / 60)}m ${s % 60}s`;
   return `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`;
+}
+
+function getRunPath(outputDir: string, runId: string): string {
+  if (!outputDir) return "";
+  return ensureChildDir(outputDir, runId);
 }
 
 export function RunsPanel({
@@ -336,7 +344,17 @@ export function RunsPanel({
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-end gap-2">
+                  <div className="flex items-center justify-end gap-2 flex-wrap">
+                    {isElectronAvailable() && run.outputDir && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="min-w-[140px] h-[34px] bg-inherit rounded-md gap-2 flex-1sm:flex-none hover:bg-primary hover:text-white"
+                        onClick={() => openPath(getRunPath(run.outputDir!, run.id))}
+                      >
+                        <FolderOpen className="h-3.5 w-3.5" /> Open Folder
+                      </Button>
+                    )}
                     <Button
                       variant="outline"
                       size="sm"
