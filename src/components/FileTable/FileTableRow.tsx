@@ -7,12 +7,8 @@ import { TableCell } from "@/components/ui/table";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import type { PDFFile, PendingFile } from "@/types";
+import { format } from "@/utils/format";
 
-function formatSize(bytes: number) {
-  if (bytes < 1024) return bytes + " B";
-  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + " KB";
-  return (bytes / 1048576).toFixed(1) + " MB";
-}
 
 const statusConfig: Record<string, { label: string; className: string }> = {
   queued: { label: "Queued", className: "bg-secondary text-secondary-foreground" },
@@ -75,7 +71,7 @@ export const FileTableRow = React.memo(
               {pf.isReference ? "Reference" : "Pending"}
             </TableCell>
             <TableCell className="text-sm text-muted-foreground" role="cell">
-              {pf.size ? formatSize(pf.size) : "-" }
+              {pf.size ? format.fileSize(pf.size) : "-" }
             </TableCell>
             <TableCell role="cell">
               <div className="flex items-center gap-2">
@@ -128,7 +124,7 @@ export const FileTableRow = React.memo(
             <span className="text-xs font-medium uppercase text-muted-foreground">{file.method}</span>
           </TableCell>
           <TableCell className="text-sm text-muted-foreground" role="cell">
-            {formatSize(file.size)}
+            {format.fileSize(file.size)}
           </TableCell>
           <TableCell role="cell">
             <div className="flex items-center gap-2">

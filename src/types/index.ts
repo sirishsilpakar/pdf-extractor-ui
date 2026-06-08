@@ -33,6 +33,7 @@ export interface Run {
   elapsedSeconds: number;
   etaSeconds: number | null;
   progressPct: number;
+  runNumber?: number;
 }
 
 export interface PaginationState {
@@ -69,6 +70,9 @@ export interface ExtractionResult {
   page_count: number | null;
   processed_at: string | null;
   run_id: string | null;
+  run_number?: number | null;
+  txt_path?: string;
+  has_duplicate?: boolean;
 }
 
 /** Full record returned by GET /api/v1/results/{id} — includes extracted text */
@@ -139,3 +143,22 @@ export interface SSEFileProgressEvent {
 }
 
 export type SSEEvent = SSEStateUpdateEvent | SSELogEvent | SSEFileProgressEvent;
+
+export interface ResultTreeDirectory {
+  run_id: string;
+  run_number?: number | null;
+  path: string;
+  count: number;
+  has_duplicate?: boolean;
+}
+
+export interface ResultTreeResponse {
+  directories: ResultTreeDirectory[];
+  directories_total: number;
+  top_level_files: ExtractionResult[];
+  top_level_files_total: number;
+  page: number;
+  size: number;
+  pages: number;
+  total: number;
+}

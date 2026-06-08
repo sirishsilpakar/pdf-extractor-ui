@@ -19,7 +19,7 @@ import {
 import type { Run, PaginationState } from "@/types";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
-import { formatDistanceToNow } from "date-fns"
+import { format } from "@/utils/format";
 
 interface Props {
   runs: Run[];
@@ -48,15 +48,16 @@ export function RunsPanel({
 }: Props) {
   const [viewingLog, setViewingLog] = useState<{
     id: string;
+    runNumber?: number;
     content: string;
   } | null>(null);
   const [loadingLog, setLoadingLog] = useState(false);
 
-  const handleLoadLog = async (runId: string) => {
+  const handleLoadLog = async (runId: string, runNumber?: number) => {
     setLoadingLog(true);
     const content = await onLoadRunLog(runId);
     if (content) {
-      setViewingLog({ id: runId, content });
+      setViewingLog({ id: runId, runNumber, content });
     }
     setLoadingLog(false);
   };
@@ -95,7 +96,7 @@ export function RunsPanel({
                   LOG
                 </Badge>
                 <h3 className="font-semibold text-sm">
-                  Activity Log for Run {viewingLog.id.slice(0, 8)}…
+                  Activity Log for Run {viewingLog.runNumber ? `#${viewingLog.runNumber}` : viewingLog.id.slice(0, 8)}
                 </h3>
               </div>
               <div className="flex items-center gap-2">
@@ -135,9 +136,10 @@ export function RunsPanel({
 
       <div className="flex items-center gap-2 px-1">
         <History className="h-5 w-5 text-primary" />
-        <h2 className="text-lg font-semibold tracking-tight">
-          Extraction History
-        </h2>
+        <h2 className="text-lg font-semibold tracking-tight leading-none">Extraction History</h2>
+        <span className="text-xs text-muted-foreground font-medium bg-secondary px-2 py-0.5 rounded-full leading-none">
+          {pagination.total} runs
+        </span>
       </div>
 
       {/* Run cards */}
@@ -154,10 +156,7 @@ export function RunsPanel({
                 </div>
                 <div className="grid grid-cols-4 gap-3">
                   {Array.from({ length: 4 }).map((_, j) => (
-                    <div
-                      key={j}
-                      className="bg-secondary/40 rounded-xl p-3 h-14 animate-pulse"
-                    />
+                    <div key={j} className="bg-secondary/40 rounded-xl p-3 h-14 animate-pulse" />
                   ))}
                 </div>
                 <div className="h-2 w-full bg-muted/20 animate-pulse rounded-full" />
@@ -199,8 +198,8 @@ export function RunsPanel({
                   color: "bg-yellow-500/10 text-yellow-500 border-yellow-500/30",
                   icon: <TriangleAlert width={12} height={12} className="mr-2" />
                 },
-                done: { 
-                  label: "Done", 
+                done: {
+                  label: "Done",
                   color: "bg-green-500/10 text-green-700 border-success/30",
                   icon: <CircleCheckBig width={12} height={12} className="mr-2" />
                 },
@@ -210,10 +209,7 @@ export function RunsPanel({
               };
 
               return (
-                <div
-                  key={run.id}
-                  className="rounded-2xl border border-border p-4 space-y-3"
-                >
+                <div key={run.id} className="rounded-2xl border border-border p-4 space-y-3">
                   {/* Card header */}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-6">
@@ -222,9 +218,9 @@ export function RunsPanel({
                         title={run.id}
                       >
                         <Send className="text-primary bg-primary/10 mr-2 p-1.5 rounded" />
-                        <span className="mr-1 font-bold">Run ID:</span>
-                        <span className="font-mono font-bold">
-                          {run.id.slice(0, 8)}…
+                        <span className="mr-1 font-bold">Run:</span>
+                        <span className="font-bold">
+                          {run.runNumber ? `#${run.runNumber}` : run.id.slice(0, 8)}
                         </span>
                       </span>
                       <Badge
@@ -233,15 +229,12 @@ export function RunsPanel({
                           statusInfo.color,
                         )}
                       >
-                        {statusInfo.icon ? statusInfo.icon : "" }
+                        {statusInfo.icon ? statusInfo.icon : ""}
                         {statusInfo.label}
                       </Badge>
                     </div>
                     <span className="text-xs text-muted-foreground">
-                      {formatDistanceToNow(run.startedAt, {
-                        addSuffix: true,
-                        includeSeconds: true,
-                      })}
+                      {format.relativeTime(run.startedAt)}
                     </span>
                   </div>
 
@@ -251,7 +244,13 @@ export function RunsPanel({
                       {
                         label: "Duration",
                         value: fmtDuration(run.elapsedSeconds),
-                        icon: <Clock4 height={40} width={40} className="text-primary rounded-sm bg-primary/10 mr-2 p-2"/>,
+                        icon: (
+                          <Clock4
+                            height={40}
+                            width={40}
+                            className="text-primary rounded-sm bg-primary/10 mr-2 p-2"
+                          />
+                        ),
                       },
                       {
                         label: "Files",
@@ -341,7 +340,7 @@ export function RunsPanel({
                       variant="outline"
                       size="sm"
                       className="min-w-[140px] h-[34px] bg-inherit rounded-md gap-2 flex-1sm:flex-none hover:bg-primary hover:text-white"
-                      onClick={() => handleLoadLog(run.id)}
+                      onClick={() => handleLoadLog(run.id, run.runNumber)}
                       disabled={loadingLog}
                     >
                       <FileText className="h-3.5 w-3.5" /> View Log
@@ -363,8 +362,7 @@ export function RunsPanel({
       {pagination.total > 0 && (
         <div className="flex items-center justify-between px-2 py-4">
           <p className="text-xs text-muted-foreground">
-            Showing page {pagination.page} of {pagination.pages} (
-            {pagination.total} runs)
+            Showing page {pagination.page} of {pagination.pages}
           </p>
           <div className="flex items-center gap-2">
             <Button
