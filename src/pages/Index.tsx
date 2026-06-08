@@ -29,7 +29,7 @@ import {
 import { useSearch, useReindexSearch } from "@/hooks/queries/useSearch";
 import { API_BASE, BATCH_SSE_URL, fetcher } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
-import { FilesListItem, NavView, PaginationState } from "@/types";
+import { FilesListItem, NavView, PaginationState, ProcessingSettings } from "@/types";
 
 const Index = () => {
   const store = useAppStore();
@@ -321,6 +321,7 @@ const Index = () => {
             ? selectedFilesPayload
             : null,
         force,
+        settings: store.settings,
       },
       {
         onSuccess: () => {
@@ -339,6 +340,20 @@ const Index = () => {
         },
       }
     );
+  };
+
+  const activeKeys: (keyof ProcessingSettings)[] = [
+    "removeHeader",
+    "removeFooter",
+    "removePageNumbers",
+    "removeNumericValues",
+    "applyTextFormatting",
+  ];
+  const applyAll = activeKeys.every((key) => store.settings[key]);
+  const handleAllUpdate = (checked: boolean) => {
+    activeKeys.forEach((key) => {
+      store.updateSetting(key, checked);
+    });
   };
 
   return (
@@ -562,9 +577,9 @@ const Index = () => {
 
         <SettingsPanel
           settings={store.settings}
-          applyAll={false}
+          applyAll={applyAll}
           onUpdate={store.updateSetting}
-          onAllUpdate={() => {}}
+          onAllUpdate={handleAllUpdate}
         />
       </div>
     </div>
