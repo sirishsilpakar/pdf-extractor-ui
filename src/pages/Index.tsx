@@ -70,11 +70,6 @@ const Index = () => {
     store.skipProcessedFiles
   );
   const { data: runsData, isPending: isRunsLoading } = useRuns(runsPage, 10);
-  const {
-    data: resultsData,
-    isPending: isResultsLoading,
-    refetch: refetchResults,
-  } = useResults(store.resultsRunFilter, resultsPage, 10);
   const { data: searchData, isPending: isSearchLoading } = useSearch(
     store.searchQuery,
     searchPage,
@@ -546,20 +541,8 @@ const Index = () => {
 
             {store.currentView === "results" && (
               <ResultsPanel
-                results={resultsData?.items || []}
-                pagination={
-                  resultsData?.pagination || {
-                    page: 1,
-                    size: 10,
-                    total: 0,
-                    pages: 1,
-                  }
-                }
                 runFilter={store.resultsRunFilter}
-                isLoading={isResultsLoading}
                 onRunFilterChange={store.setResultsRunFilter}
-                onPageChange={setResultsPage}
-                onRefresh={() => refetchResults()}
                 onGetDetail={async (id) => {
                   try {
                     return await fetcher(`/results/${id}`);

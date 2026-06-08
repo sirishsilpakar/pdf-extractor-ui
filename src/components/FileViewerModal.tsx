@@ -1,14 +1,10 @@
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Download, FileText, FolderOpen } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { ExtractionResultDetail } from "@/types";
 import { isElectronAvailable, showInFolder } from "@/lib/electron";
 import { cn } from "@/lib/utils";
+import { format } from "@/utils/format";
 
 interface Props {
   open: boolean;
@@ -16,6 +12,8 @@ interface Props {
   fileName: string;
   detail: ExtractionResultDetail | null;
   downloadUrl: string;
+  isLoading?: boolean;
+  isError?: boolean;
 }
 
 export function FileViewerModal({
@@ -24,11 +22,11 @@ export function FileViewerModal({
   fileName,
   detail,
   downloadUrl,
+  isLoading,
+  isError,
 }: Props) {
   const highConf =
-    detail?.confidence !== null &&
-    detail?.confidence !== undefined &&
-    detail.confidence >= 0.85;
+    detail?.confidence !== null && detail?.confidence !== undefined && detail.confidence >= 0.85;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -57,23 +55,16 @@ export function FileViewerModal({
               <span className="font-medium uppercase tracking-wider text-foreground/70">
                 {detail.method || "?"} EXTRACTION
               </span>
-              <span>{(detail.char_count || 0).toLocaleString()} chars</span>
-              {detail.page_count != null && (
-                <span>{detail.page_count} pages</span>
-              )}
+              <span>{format.chars(detail.char_count)}</span>
+              {detail.page_count != null && <span>{format.number(detail.page_count)} pages</span>}
               {detail.confidence != null && (
                 <span
-                  className={cn(
-                    "font-semibold",
-                    highConf ? "text-success" : "text-destructive",
-                  )}
+                  className={cn("font-semibold", highConf ? "text-success" : "text-destructive")}
                 >
-                  {(detail.confidence * 100).toFixed(1)}% confidence
+                  {format.percent(detail.confidence)} confidence
                 </span>
               )}
-              {detail.processed_at && (
-                <span>{new Date(detail.processed_at).toLocaleString()}</span>
-              )}
+              {detail.processed_at && <span>{format.dateTime(detail.processed_at)}</span>}
             </div>
             <div className="flex items-center gap-2 mr-8 shrink-0">
               {isElectronAvailable() && detail.txt_path && (
@@ -98,14 +89,16 @@ export function FileViewerModal({
         {/* Body */}
         <ScrollArea className="flex-1 bg-secondary/10">
           <div className="px-8 py-4">
-            {!detail ? (
-              <div className="flex flex-col items-center justify-center h-40 gap-3 text-muted-foreground">
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center h-[50vh] gap-3 text-muted-foreground">
                 <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-                <p className="text-sm font-medium">
-                  Loading extracted content…
-                </p>
+                <p className="text-sm font-medium">Loading extracted content...</p>
               </div>
-            ) : detail.content ? (
+            ) : isError ? (
+              <div className="flex flex-col items-center justify-center h-[50vh] gap-2 text-destructive">
+                <p className="text-sm font-semibold">File not found</p>
+              </div>
+            ) : detail?.content ? (
               <pre className="text-sm font-mono whitespace-pre-wrap break-words leading-relaxed text-foreground/90 selection:bg-primary/20">
                 {detail.content}
               </pre>
