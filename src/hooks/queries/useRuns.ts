@@ -25,6 +25,7 @@ export function useRuns(page: number, size: number) {
         elapsedSeconds: r.elapsed_seconds || 0,
         etaSeconds: r.eta_seconds || null,
         progressPct: r.progress_pct || 0,
+        outputDir: (r.output_dir as string) || undefined,
         runNumber: (r.run_number as number) || undefined,
       }));
       return {

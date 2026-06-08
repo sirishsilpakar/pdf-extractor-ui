@@ -14,9 +14,12 @@ import {
   ScanLine,
   TriangleAlert,
   Ban,
-  FileCog
+  FileCog,
+  FolderOpen
 } from "lucide-react";
 import type { Run, PaginationState } from "@/types";
+import { isElectronAvailable, openPath } from "../lib/electron";
+import { ensureChildDir } from "@/lib/fs";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { format } from "@/utils/format";
@@ -36,6 +39,11 @@ function fmtDuration(secs: number) {
   if (s < 60) return `${s}s`;
   if (s < 3600) return `${Math.floor(s / 60)}m ${s % 60}s`;
   return `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`;
+}
+
+function getRunPath(outputDir: string, runId: string): string {
+  if (!outputDir) return "";
+  return ensureChildDir(outputDir, runId);
 }
 
 export function RunsPanel({
@@ -256,38 +264,43 @@ export function RunsPanel({
                         label: "Files",
                         value: `${run.completedFiles} / ${total}`,
                         sub: failed > 0 ? `${failed} failed` : undefined,
-                        icon: <FileMinus height={40} width={40} className="text-primary rounded-sm bg-primary/10 mr-2 p-2"/>,
+                        icon: (
+                          <FileMinus
+                            height={40}
+                            width={40}
+                            className="text-primary rounded-sm bg-primary/10 mr-2 p-2"
+                          />
+                        ),
                       },
-                      { 
-                        label: "Direct", 
+                      {
+                        label: "Direct",
                         value: String(direct),
-                        icon: <FolderDown height={40} width={40} className="text-primary rounded-sm bg-primary/10 mr-2 p-2"/>,
+                        icon: (
+                          <FolderDown
+                            height={40}
+                            width={40}
+                            className="text-primary rounded-sm bg-primary/10 mr-2 p-2"
+                          />
+                        ),
                       },
-                      { 
+                      {
                         label: "OCR",
                         value: String(ocr),
-                        icon: <ScanLine height={40} width={40} className="text-amber-500 rounded-sm bg-amber-500/10 mr-2 p-2"/>,
+                        icon: (
+                          <ScanLine
+                            height={40}
+                            width={40}
+                            className="text-amber-500 rounded-sm bg-amber-500/10 mr-2 p-2"
+                          />
+                        ),
                       },
                     ].map((s) => (
-                      <div
-                        key={s.label}
-                        className="bg-secondary/40 rounded-xl p-3 flex"
-                      >
-                        <div className="mr-2">
-                          {s.icon}
-                        </div>
+                      <div key={s.label} className="bg-secondary/40 rounded-xl p-3 flex">
+                        <div className="mr-2">{s.icon}</div>
                         <div>
-                          <p className="text-[10px] text-muted-foreground">
-                            {s.label}
-                          </p>
-                          <p className="font-bold text-lg">
-                            {s.value}
-                          </p>
-                          {s.sub && (
-                            <p className="text-[10px] text-destructive mt-0.5">
-                              {s.sub}
-                            </p>
-                          )}
+                          <p className="text-[10px] text-muted-foreground">{s.label}</p>
+                          <p className="font-bold text-lg">{s.value}</p>
+                          {s.sub && <p className="text-[10px] text-destructive mt-0.5">{s.sub}</p>}
                         </div>
                       </div>
                     ))}
@@ -298,23 +311,20 @@ export function RunsPanel({
                     <div className="flex justify-between text-[10px] font-medium px-0.5">
                       <div className="flex gap-8">
                         <span className="text-blue-500 flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />{" "}
-                          Direct {directPct}%
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-600" /> Direct{" "}
+                          {directPct}%
                         </span>
                         <span className="text-amber-500 flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />{" "}
-                          OCR {ocrPct}%
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" /> OCR {ocrPct}%
                         </span>
                         {failedPct > 0 && (
                           <span className="text-destructive flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-destructive" />{" "}
-                            Failed {failedPct}%
+                            <span className="w-1.5 h-1.5 rounded-full bg-destructive" /> Failed{" "}
+                            {failedPct}%
                           </span>
                         )}
                       </div>
-                      <span className="text-muted-foreground">
-                        Total {total} files
-                      </span>
+                      <span className="text-muted-foreground">Total {total} files</span>
                     </div>
                     <div className="h-2 rounded-full bg-secondary/60 overflow-hidden flex shadow-inner">
                       <div
@@ -335,7 +345,17 @@ export function RunsPanel({
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-end gap-2">
+                  <div className="flex items-center justify-end gap-2 flex-wrap">
+                    {isElectronAvailable() && run.outputDir && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="min-w-[140px] h-[34px] bg-inherit rounded-md gap-2 flex-1sm:flex-none hover:bg-primary hover:text-white"
+                        onClick={() => openPath(getRunPath(run.outputDir!, run.id))}
+                      >
+                        <FolderOpen className="h-3.5 w-3.5" /> Open Folder
+                      </Button>
+                    )}
                     <Button
                       variant="outline"
                       size="sm"

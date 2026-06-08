@@ -71,6 +71,7 @@ export function useStartJob() {
       file_ids: string[]
       selected_files: Record<string, string[]> | null
       force: boolean
+      output_dir?: string
       settings: ProcessingSettings | null
     }) =>
       fetcher("/job/start", {

@@ -1,23 +1,21 @@
-import { useRef, useState } from "react";
 import { FileUp, FolderUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { openFile, openFolder } from "@/lib/electron";
 
 interface PathImporterProps {
   onAddPath: (path: string) => void;
 }
 
 export function PathImporter({ onAddPath }: PathImporterProps) {
-
   const onImportFiles = async (mode: "single" | "multiple") => {
     if (mode === "single") {
-      const path = await window.electronAPI.openFile();
-      if (path ) {
+      const path = await openFile();
+      if (path) {
         onAddPath(path);
       }
     } else if (mode === "multiple") {
-      const path = await window.electronAPI.openFolder();
-      if (path ) {
+      const path = await openFolder();
+      if (path) {
         onAddPath(path);
       }
     }
