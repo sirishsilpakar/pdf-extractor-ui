@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetcher } from "@/lib/api";
-import type { PDFFile, PaginationState } from "@/types";
+import type { PDFFile, PaginationState, ProcessingSettings } from "@/types";
 
 export function useJobStatus() {
   return useQuery({
@@ -72,6 +72,7 @@ export function useStartJob() {
       selected_files: Record<string, string[]> | null
       force: boolean
       output_dir?: string
+      settings: ProcessingSettings | null
     }) =>
       fetcher("/job/start", {
         method: "POST",
