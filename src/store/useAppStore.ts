@@ -12,6 +12,7 @@ const defaultSettings: ProcessingSettings = {
   removePageNumbers: true,
   removeNumericValues: true,
   enableLemmatization: false,
+  applyTextFormatting: true,
 };
 
 interface UIState {
@@ -36,6 +37,8 @@ interface SelectionState {
 interface SettingsState {
   settings: ProcessingSettings;
   updateSetting: <K extends keyof ProcessingSettings>(key: K, value: ProcessingSettings[K]) => void;
+  extractionOutputDir: string;
+  setExtractionOutputDir: (path: string) => void;
 }
 
 interface LogState {
@@ -78,6 +81,12 @@ interface SSEState {
   /** True when the user chose to skip already processed files for the current job. */
   skipProcessedFiles: boolean;
   setSkipProcessedFiles: (val: boolean) => void;
+
+  elapsedSeconds: number;
+  setElapsedSeconds: (val: number) => void;
+
+  etaSeconds: number | null;
+  setEtaSeconds: (val: number | null) => void;
 }
 
 type AppState = UIState & SelectionState & SettingsState & LogState & PendingFilesState & ReprocessState & SSEState;
@@ -107,9 +116,18 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // Settings State
   settings: defaultSettings,
-  updateSetting: (key, value) => set((state) => ({
-    settings: { ...state.settings, [key]: value },
-  })),
+  updateSetting: (key, value) =>
+    set((state) => ({
+      settings: { ...state.settings, [key]: value },
+    })),
+  extractionOutputDir:
+    typeof window !== "undefined" ? localStorage.getItem("extractionOutputDir") || "" : "",
+  setExtractionOutputDir: (path) => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("extractionOutputDir", path);
+    }
+    set({ extractionOutputDir: path });
+  },
 
   // Log State
   logs: [],
@@ -167,4 +185,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   setCurrentRunId: (val) => set({ currentRunId: val }),
   skipProcessedFiles: false,
   setSkipProcessedFiles: (val) => set({ skipProcessedFiles: val }),
+  elapsedSeconds: 0,
+  setElapsedSeconds: (val) => set({ elapsedSeconds: val }),
+  etaSeconds: null,
+  setEtaSeconds: (val) => set({ etaSeconds: val }),
 }));

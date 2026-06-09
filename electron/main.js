@@ -10,7 +10,7 @@ import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import { spawn } from "child_process";
-import { ipcMain, dialog } from "electron";
+import { ipcMain, dialog, shell } from "electron";
 
 ipcMain.handle("open-file-dialog", async () => {
   const result = await dialog.showOpenDialog({
@@ -25,6 +25,18 @@ ipcMain.handle("open-folder-dialog", async () => {
     properties: ["openDirectory"],
   });
   return result.filePaths[0]
+});
+
+ipcMain.handle("open-path", async (event, folderPath) => {
+  if (folderPath) {
+    await shell.openPath(folderPath);
+  }
+});
+
+ipcMain.handle("show-item-in-folder", async (event, filePath) => {
+  if (filePath) {
+    shell.showItemInFolder(path.normalize(filePath));
+  }
 });
 
 const __filename = fileURLToPath(import.meta.url);

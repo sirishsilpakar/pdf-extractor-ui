@@ -29,7 +29,12 @@ import {
 import { useSearch, useReindexSearch } from "@/hooks/queries/useSearch";
 import { API_BASE, BATCH_SSE_URL, fetcher } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
-import { FilesListItem, PaginationState } from "@/types";
+import { FilesListItem, NavView, PaginationState, ProcessingSettings } from "@/types";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { FolderOpen, Trash2, Info } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { isElectronAvailable, openFolder } from "@/lib/electron";
 
 const Index = () => {
   const store = useAppStore();
@@ -51,8 +56,13 @@ const Index = () => {
     setSearchPage(1);
   }, [store.searchQuery]);
 
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      store.setCurrentView(localStorage.getItem('view') as NavView)
+    }
+  }, [])
+
   // Queries
-  const { data: jobStatus } = useJobStatus();
   const { data: jobFiles, isPending: isFilesLoading } = useJobFiles(
     filesPage,
     10,
@@ -60,11 +70,6 @@ const Index = () => {
     store.skipProcessedFiles
   );
   const { data: runsData, isPending: isRunsLoading } = useRuns(runsPage, 10);
-  const {
-    data: resultsData,
-    isPending: isResultsLoading,
-    refetch: refetchResults,
-  } = useResults(store.resultsRunFilter, resultsPage, 10);
   const { data: searchData, isPending: isSearchLoading } = useSearch(
     store.searchQuery,
     searchPage,
@@ -109,6 +114,35 @@ const Index = () => {
   const { mutate: startJob } = useStartJob();
   const { mutate: reindexSearch } = useReindexSearch();
 
+  const [dirError, setDirError] = useState<string | null>(null);
+
+  const handleValidateDir = async (
+    path: string,
+    showToast = true,
+  ): Promise<{ ok: boolean; error?: string }> => {
+    if (!path.trim()) {
+      setDirError(null);
+      return { ok: true };
+    }
+    try {
+      await fetcher("/job/validate-directory", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path }),
+      });
+      setDirError(null);
+      return { ok: true };
+    } catch (err: any) {
+      setDirError(err.message);
+      if (showToast) {
+        toast.error("Directory not writable", {
+          description: err.message,
+        });
+      }
+      return { ok: false, error: err.message };
+    }
+  };
+
   // After we get job status done from Batch processing stream
   const pendingFiles = useMemo(() => {
     if (!batchStatusData?.items?.length) return [];
@@ -137,6 +171,7 @@ const Index = () => {
         file: f,
         id: crypto.randomUUID(),
         hash: null as string | null,
+        size: f.size,
         relPath,
         absPath,
       };
@@ -169,7 +204,7 @@ const Index = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ path }),
       });
-      
+
       store.setCurrentView("dashboard");
 
       if (!res.ok) {
@@ -180,7 +215,7 @@ const Index = () => {
         );
         return;
       }
-     
+
       const data = await res.json();
       if (data.batch_id) {
         getBatchStatusStream();
@@ -216,6 +251,17 @@ const Index = () => {
     force = false,
     skipDuplicates = false,
   ) => {
+    // Validate output directory before starting job
+    if (store.extractionOutputDir) {
+      const validation = await handleValidateDir(store.extractionOutputDir, false);
+      if (!validation.ok) {
+        toast.error("Fix the output directory in settings", {
+          description: validation.error || "The target folder is not writable.",
+        });
+        return;
+      }
+    }
+
     // 0. Duplicate Check
     if (!force && !skipDuplicates) {
       const hashes = store.pendingFiles
@@ -314,6 +360,8 @@ const Index = () => {
             ? selectedFilesPayload
             : null,
         force,
+        output_dir: store.extractionOutputDir ?? "",
+        settings: store.settings,
       },
       {
         onSuccess: () => {
@@ -332,6 +380,20 @@ const Index = () => {
         },
       }
     );
+  };
+
+  const activeKeys: (keyof ProcessingSettings)[] = [
+    "removeHeader",
+    "removeFooter",
+    "removePageNumbers",
+    "removeNumericValues",
+    "applyTextFormatting",
+  ];
+  const applyAll = activeKeys.every((key) => store.settings[key]);
+  const handleAllUpdate = (checked: boolean) => {
+    activeKeys.forEach((key) => {
+      store.updateSetting(key, checked);
+    });
   };
 
   return (
@@ -358,7 +420,10 @@ const Index = () => {
       <div className="flex flex-1 overflow-hidden">
         <AppSidebar
           currentView={store.currentView}
-          onViewChange={store.setCurrentView}
+          onViewChange={(v) => {
+              localStorage.setItem('view', v)
+              store.setCurrentView(v);
+          }}
           stats={{
             total: store.totalFiles,
             completed: store.completedFiles,
@@ -387,6 +452,8 @@ const Index = () => {
                   processingFile={store.processingFile}
                   pendingFilesCount={store.pendingFiles.length}
                   isProcessing={store.isProcessing}
+                  elapsedSeconds={store.elapsedSeconds}
+                  etaSeconds={store.etaSeconds}
                   onCancel={() => {
                     cancelJob();
                     store.setSkipProcessedFiles(false);
@@ -415,9 +482,16 @@ const Index = () => {
                   onRetry={() => {}}
                   dropFiles={async (e) => {
                     if (e.dataTransfer.items) {
-                      const files = await getFilesFromDataTransfer(
-                        e.dataTransfer.items,
+                      const hasFolder = Array.from(e.dataTransfer.items).some(
+                        (item) => item.webkitGetAsEntry()?.isDirectory,
                       );
+                      if (hasFolder) {
+                        toast.error(
+                          "Folders are not supported. Please upload PDF files only.",
+                        );
+                        return;
+                      }
+                      const files = await getFilesFromDataTransfer(e.dataTransfer.items);
                       if (files.length > 0) handleAddFiles(files);
                     } else if (e.dataTransfer.files) {
                       handleAddFiles(e.dataTransfer.files);
@@ -467,20 +541,8 @@ const Index = () => {
 
             {store.currentView === "results" && (
               <ResultsPanel
-                results={resultsData?.items || []}
-                pagination={
-                  resultsData?.pagination || {
-                    page: 1,
-                    size: 10,
-                    total: 0,
-                    pages: 1,
-                  }
-                }
                 runFilter={store.resultsRunFilter}
-                isLoading={isResultsLoading}
                 onRunFilterChange={store.setResultsRunFilter}
-                onPageChange={setResultsPage}
-                onRefresh={() => refetchResults()}
                 onGetDetail={async (id) => {
                   try {
                     return await fetcher(`/results/${id}`);
@@ -528,12 +590,99 @@ const Index = () => {
             )}
 
             {store.currentView === "settings" && (
-              <div className="glass rounded-2xl p-6">
-                <h2 className="font-semibold mb-4 text-lg">System Settings</h2>
-                <div className="space-y-4">
-                  <p className="text-sm text-muted-foreground">
-                    Configure the PDF extraction pipeline settings in the panel
-                    on the right.
+              <div className="glass rounded-2xl p-6 space-y-6">
+                <div>
+                  <h2 className="font-semibold text-lg flex items-center gap-2">
+                    <span className="p-1.5 rounded-lg bg-primary/10 text-primary">
+                      <FolderOpen className="h-5 w-5" />
+                    </span>
+                    Extraction Output Directory
+                  </h2>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Configure where the extracted text files will be saved on your system.
+                  </p>
+                </div>
+
+                <div className="space-y-4 max-w-2xl bg-secondary/20 p-4 rounded-xl border border-border/40">
+                  <div className="flex items-start gap-2.5 text-xs text-muted-foreground">
+                    <Info className="h-4 w-4 shrink-0 text-primary mt-0.5" />
+                    <div>
+                      <p className="font-medium text-foreground">Storage Resolution</p>
+                      <p className="mt-0.5 text-muted-foreground">
+                        If left blank, files will be saved to the default <code className="px-1.5 py-0.5 rounded bg-secondary-foreground/10 text-foreground font-mono">extracted_files</code> directory.
+                        Providing an absolute path will write files directly to that folder.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
+                      Target Folder Path
+                    </label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="text"
+                        placeholder="e.g. /Users/username/extracted_files"
+                        value={store.extractionOutputDir}
+                        onChange={(e) => {
+                          store.setExtractionOutputDir(e.target.value);
+                          if (dirError) setDirError(null);
+                        }}
+                        onBlur={async (e) => {
+                          await handleValidateDir(e.target.value);
+                        }}
+                        className={cn(
+                          "font-mono text-sm bg-background/50",
+                          dirError && "border-destructive focus-visible:ring-destructive"
+                        )}
+                      />
+                      {isElectronAvailable() && (
+                        <Button
+                          variant="secondary"
+                          onClick={async () => {
+                            const selectedPath = await openFolder();
+                            if (selectedPath) {
+                              store.setExtractionOutputDir(selectedPath);
+                              const res = await handleValidateDir(selectedPath);
+                              if (res.ok) {
+                                toast.success("Output directory updated", {
+                                  description: selectedPath,
+                                });
+                              }
+                            }
+                          }}
+                          className="gap-1.5 shrink-0"
+                        >
+                          <FolderOpen className="h-4 w-4" />
+                          Select
+                        </Button>
+                      )}
+                      {store.extractionOutputDir && (
+                        <Button
+                          variant="ghost"
+                          onClick={() => {
+                            store.setExtractionOutputDir("");
+                            setDirError(null);
+                            toast.success("Reset to default output directory");
+                          }}
+                          className="shrink-0 text-muted-foreground hover:text-destructive"
+                          title="Reset to default"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                    {dirError && (
+                      <p className="text-xs text-destructive font-medium mt-1">
+                        {dirError}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="border-t border-border/50 pt-4">
+                  <p className="text-xs text-muted-foreground">
+                    Other processing settings (like header/footer removal) are configured using the control panel on the right.
                   </p>
                 </div>
               </div>
@@ -543,9 +692,9 @@ const Index = () => {
 
         <SettingsPanel
           settings={store.settings}
-          applyAll={false}
+          applyAll={applyAll}
           onUpdate={store.updateSetting}
-          onAllUpdate={() => {}}
+          onAllUpdate={handleAllUpdate}
         />
       </div>
     </div>

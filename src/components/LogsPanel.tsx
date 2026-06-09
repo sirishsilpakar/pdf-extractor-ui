@@ -56,7 +56,7 @@ export function LogsPanel({ logs, autoscroll, onToggleAutoscroll }: Props) {
     >
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/50">
         <div className="flex items-center gap-2">
-          <Terminal className="h-4 w-4 text-accent" aria-hidden="true" />
+          <Terminal className="h-4 w-4 text-primary" aria-hidden="true" />
           <h3 className="font-semibold text-sm">Activity Log</h3>
           <span className="text-xs text-muted-foreground" aria-live="polite" aria-atomic="true">
             ({logs.length} entries)
@@ -67,18 +67,18 @@ export function LogsPanel({ logs, autoscroll, onToggleAutoscroll }: Props) {
              <Button
                 variant="ghost"
                 size="sm"
-                className="rounded-xl gap-1 text-[10px] h-6 px-2 bg-accent/20 text-accent animate-pulse"
+                className="rounded-xl gap-1 text-[10px] h-6 px-2 text-white bg-primary animate-pulse hover:bg-primary hover:text-white"
                 onClick={onToggleAutoscroll}
                 aria-label="Resume auto-scroll"
               >
                 Resume Auto-scroll
               </Button>
-          )}
+           )}
 
           <Button
             variant="ghost"
             size="sm"
-            className="rounded-xl gap-1 text-xs h-7"
+            className="rounded-xl gap-1 text-xs h-7 hover:bg-primary hover:text-white"
             onClick={() => {
               const text = logs.map(l => `[${l.timestamp.toLocaleTimeString()}] [${typePrefix[l.type]}] ${l.message}`).join("\n");
               const blob = new Blob([text], { type: 'text/plain' });

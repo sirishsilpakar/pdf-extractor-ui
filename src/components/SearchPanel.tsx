@@ -30,6 +30,8 @@ export function SearchPanel({
   const [inputValue, setInputValue] = useState(query);
   const [viewingResult, setViewingResult] = useState<SearchResult | null>(null);
   const [viewingDetail, setViewingDetail] = useState<ExtractionResultDetail | null>(null);
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
+  const [detailError, setDetailError] = useState(false);
 
   // Sync with global query (e.g. from header)
   useEffect(() => {
@@ -43,17 +45,40 @@ export function SearchPanel({
   const handleView = async (r: SearchResult) => {
     setViewingResult(r);
     setViewingDetail(null);
-    const detail = await onGetDetail(r.resultId);
-    setViewingDetail(detail);
+    setIsLoadingDetail(true);
+    setDetailError(false);
+
+    try {
+      const detail = await onGetDetail(r.resultId);
+      if (detail) {
+        setViewingDetail(detail);
+      } else {
+        setDetailError(true);
+      }
+    } catch (e) {
+      console.error("Failed to load result text detail", e);
+      setDetailError(true);
+    } finally {
+      setIsLoadingDetail(false);
+    }
   };
 
   return (
     <div className="space-y-4">
       <FileViewerModal
         open={!!viewingResult}
-        onOpenChange={(open) => { if (!open) { setViewingResult(null); setViewingDetail(null); } }}
+        onOpenChange={(open) => {
+          if (!open) {
+            setViewingResult(null);
+            setViewingDetail(null);
+            setIsLoadingDetail(false);
+            setDetailError(false);
+          }
+        }}
         fileName={viewingResult?.file || ""}
         detail={viewingDetail}
+        isLoading={isLoadingDetail}
+        isError={detailError}
         downloadUrl={viewingResult ? getDownloadUrl(viewingResult.resultId) : ""}
       />
 
@@ -73,7 +98,7 @@ export function SearchPanel({
           <Button onClick={handleSearch} className="rounded-xl px-5">
             Search
           </Button>
-          <Button variant="outline" onClick={onReindex} className="rounded-xl gap-2" title="Build full-text search index from all extracted files">
+          <Button variant="outline" onClick={onReindex} className="rounded-xl gap-2 hover:bg-primary hover:text-white" title="Build full-text search index from all extracted files">
             <RefreshCw className="h-4 w-4" />
             <span className="hidden sm:inline">Build Index</span>
           </Button>
@@ -134,7 +159,7 @@ export function SearchPanel({
                     <Button
                       variant="outline"
                       size="sm"
-                      className="rounded-lg h-7 text-xs"
+                      className="rounded-lg h-7 text-xs hover:bg-primary hover:text-white"
                       onClick={() => handleView(r)}
                     >
                       View →
@@ -157,7 +182,7 @@ export function SearchPanel({
       {pagination.total > 0 && (
         <div className="flex items-center justify-between px-2">
           <p className="text-xs text-muted-foreground">
-            {pagination.total} result{pagination.total !== 1 ? 's' : ''} — page {pagination.page} of {pagination.pages}
+            Showing page {pagination.page} of {pagination.pages} ({pagination.total} result{pagination.total !== 1 ? 's' : ''})
           </p>
           <div className="flex items-center gap-2">
             <Button

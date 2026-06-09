@@ -48,7 +48,7 @@ export function ReprocessModal({
           <Button 
             variant="outline" 
             onClick={onSkip} 
-            className="rounded-xl flex-1"
+            className="bg-inherit rounded-xl flex-1 hover:bg-primary hover:text-white"
           >
             Skip Existing
           </Button>

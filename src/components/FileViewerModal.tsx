@@ -1,14 +1,10 @@
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Download, FileText } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Download, FileText, FolderOpen } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { ExtractionResultDetail } from "@/types";
+import { isElectronAvailable, showInFolder } from "@/lib/electron";
 import { cn } from "@/lib/utils";
+import { format } from "@/utils/format";
 
 interface Props {
   open: boolean;
@@ -16,10 +12,21 @@ interface Props {
   fileName: string;
   detail: ExtractionResultDetail | null;
   downloadUrl: string;
+  isLoading?: boolean;
+  isError?: boolean;
 }
 
-export function FileViewerModal({ open, onOpenChange, fileName, detail, downloadUrl }: Props) {
-  const highConf = detail?.confidence !== null && detail?.confidence !== undefined && detail.confidence >= 0.85;
+export function FileViewerModal({
+  open,
+  onOpenChange,
+  fileName,
+  detail,
+  downloadUrl,
+  isLoading,
+  isError,
+}: Props) {
+  const highConf =
+    detail?.confidence !== null && detail?.confidence !== undefined && detail.confidence >= 0.85;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -31,49 +38,67 @@ export function FileViewerModal({ open, onOpenChange, fileName, detail, download
               <FileText className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <DialogTitle className="text-base font-semibold leading-tight">{fileName}</DialogTitle>
+              <DialogTitle className="text-base font-semibold leading-tight">
+                {fileName}
+              </DialogTitle>
               <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold mt-0.5">
                 Extracted Text Content
               </p>
             </div>
           </div>
-          <a
-            href={downloadUrl}
-            download
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-border/70 text-xs font-medium hover:bg-secondary/60 transition-colors mr-8 shrink-0 mt-1"
-          >
-            <Download className="h-3.5 w-3.5" /> Download .txt
-          </a>
         </DialogHeader>
 
         {/* Metadata bar */}
         {detail && (
-          <div className="flex items-center gap-4 px-4 py-2 bg-secondary/20 border-b border-border/30 text-xs text-muted-foreground shrink-0 flex-wrap">
-            <span className="font-medium uppercase tracking-wider text-foreground/70">
-              📄 {detail.method || "?"}
-            </span>
-            <span>📝 {(detail.char_count || 0).toLocaleString()} chars</span>
-            {detail.page_count != null && <span>📃 {detail.page_count} pages</span>}
-            {detail.confidence != null && (
-              <span className={cn("font-semibold", highConf ? "text-success" : "text-destructive")}>
-                🎯 {(detail.confidence * 100).toFixed(1)}% confidence
+          <div className="flex justify-between border-b border-border/30 bg-secondary/20 text-xs text-muted-foreground">
+            <div className="flex items-center gap-4 px-4 py-2 shrink-0 flex-wrap">
+              <span className="font-medium uppercase tracking-wider text-foreground/70">
+                {detail.method || "?"} EXTRACTION
               </span>
-            )}
-            {detail.processed_at && (
-              <span>🕒 {new Date(detail.processed_at).toLocaleString()}</span>
-            )}
+              <span>{format.chars(detail.char_count)}</span>
+              {detail.page_count != null && <span>{format.number(detail.page_count)} pages</span>}
+              {detail.confidence != null && (
+                <span
+                  className={cn("font-semibold", highConf ? "text-success" : "text-destructive")}
+                >
+                  {format.percent(detail.confidence)} confidence
+                </span>
+              )}
+              {detail.processed_at && <span>{format.dateTime(detail.processed_at)}</span>}
+            </div>
+            <div className="flex items-center gap-2 mr-8 shrink-0">
+              {isElectronAvailable() && detail.txt_path && (
+                <button
+                  onClick={() => showInFolder(detail.txt_path!)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors hover:text-primary text-muted-foreground"
+                >
+                  <FolderOpen className="h-3.5 w-3.5" /> Show in Folder
+                </button>
+              )}
+              <a
+                href={downloadUrl}
+                download
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors hover:text-primary text-muted-foreground"
+              >
+                <Download className="h-3.5 w-3.5" /> Download .txt
+              </a>
+            </div>
           </div>
         )}
 
         {/* Body */}
         <ScrollArea className="flex-1 bg-secondary/10">
-          <div className="p-8">
-            {!detail ? (
-              <div className="flex flex-col items-center justify-center h-40 gap-3 text-muted-foreground">
+          <div className="px-8 py-4">
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center h-[50vh] gap-3 text-muted-foreground">
                 <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-                <p className="text-sm font-medium">Loading extracted content…</p>
+                <p className="text-sm font-medium">Loading extracted content...</p>
               </div>
-            ) : detail.content ? (
+            ) : isError ? (
+              <div className="flex flex-col items-center justify-center h-[50vh] gap-2 text-destructive">
+                <p className="text-sm font-semibold">File not found</p>
+              </div>
+            ) : detail?.content ? (
               <pre className="text-sm font-mono whitespace-pre-wrap break-words leading-relaxed text-foreground/90 selection:bg-primary/20">
                 {detail.content}
               </pre>
