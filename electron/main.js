@@ -13,6 +13,25 @@ import { fileURLToPath } from "url";
 import { spawn } from "child_process";
 import { ipcMain, dialog, shell } from "electron";
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+function getPortFilePath() {
+  const isDev = process.env.VITE_DEV_SERVER_URL !== undefined;
+  if (isDev) {
+    // Check backend directory: repo/pdf-extractor/port.json
+    const portFilePath = path.join(__dirname, "../pdf-extractor/port.json");
+    if (fs.existsSync(portFilePath)) {
+      return portFilePath;
+    }
+    // Fallback: Check UI project root
+    return path.join(__dirname, "./port.json");
+  } else {
+    // Production: ~/.pdf-extractor/port.json
+    return path.join(os.homedir(), ".pdf-extractor", "port.json");
+  }
+}
+
 ipcMain.handle("open-file-dialog", async () => {
   const result = await dialog.showOpenDialog({
     properties: ["openFile"],
@@ -41,20 +60,7 @@ ipcMain.handle("show-item-in-folder", async (event, filePath) => {
 });
 
 ipcMain.handle("get-backend-port", async () => {
-  const isDev = process.env.VITE_DEV_SERVER_URL !== undefined;
-  let portFilePath;
-  if (isDev) {
-    // Sibling backend directory: repo/pdf-extractor/port.json
-    portFilePath = path.join(__dirname, "../../pdf-extractor/port.json");
-    if (!fs.existsSync(portFilePath)) {
-      // Fallback: check project root or bin directory
-      portFilePath = path.join(__dirname, "../port.json");
-    }
-  } else {
-    // Production: ~/.pdf-extractor/port.json
-    portFilePath = path.join(os.homedir(), ".pdf-extractor", "port.json");
-  }
-
+  const portFilePath = getPortFilePath();
   try {
     if (fs.existsSync(portFilePath)) {
       const data = fs.readFileSync(portFilePath, "utf8");
@@ -66,9 +72,6 @@ ipcMain.handle("get-backend-port", async () => {
   }
   return null;
 });
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -188,6 +191,7 @@ function startBackend() {
     TESSDATA_PREFIX: tessdataPath,
     SERVER_PORT: isDev ? "8080" : "0",
     SERVE_UI: "false", // headless mode
+    PORT_FILE_PATH: getPortFilePath(),
   }
 
   // Add library paths for macOS and Linux to find bundled shared libraries
@@ -201,7 +205,7 @@ function startBackend() {
     console.log("  LD_LIBRARY_PATH:", env.LD_LIBRARY_PATH)
   }
 
-  backendProcess = spawn(backendPath, {
+  backendProcess = spawn(backendPath, [], {
     cwd: path.dirname(backendPath),
     env: env,
   })
@@ -235,6 +239,17 @@ function startBackend() {
 app.on("will-quit", () => {
   if (backendProcess) {
     backendProcess.kill()
+  }
+
+  // Clean up port.json file
+  const portFilePath = getPortFilePath();
+  try {
+    if (fs.existsSync(portFilePath)) {
+      fs.unlinkSync(portFilePath);
+      console.log("Cleaned up port file:", portFilePath);
+    }
+  } catch (err) {
+    console.error("Failed to delete port file on exit:", err);
   }
 })
 
