@@ -64,11 +64,16 @@ build-win:
     - node --version
     - npm --version
     - npm ci --cache .npm --prefer-offline
+    - |
+      if ($env:CI_COMMIT_TAG) {
+        $CLEAN_VERSION = $env:CI_COMMIT_TAG -replace '^v', ''
+        npm version $CLEAN_VERSION --no-git-tag-version --allow-same-version
+      }
   script:
     - echo "==> Fetching pre-built Windows Python backend from registry..."
     - |
       $BACKEND_VERSION = if ($env:CI_COMMIT_TAG) { $env:CI_COMMIT_TAG } else { "dev-$env:CI_COMMIT_SHORT_SHA" }
-      $WIN_BACKEND_URL = "${env:CI_API_V4_URL}/projects/${env:BACKEND_PROJECT_ID}/packages/generic/pdf-extractor-backend/${BACKEND_VERSION}/pdf-extractor-backend-windows.zip"
+      $WIN_BACKEND_URL = "${env:CI_API_V4_URL}/projects/${env:BACKEND_PROJECT_ID}/packages/generic/pdf-textract-backend/${BACKEND_VERSION}/pdf-textract-backend-windows-${BACKEND_VERSION}.zip"
       
       echo "DEBUG: Target Windows Registry URL is -> $WIN_BACKEND_URL"
       
@@ -100,17 +105,22 @@ build-linux:
     policy: pull-push
   before_script:
     - npm ci --cache .npm --prefer-offline
+    - |
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        CLEAN_VERSION=$(echo "$CI_COMMIT_TAG" | sed 's/^v//')
+        npm version "$CLEAN_VERSION" --no-git-tag-version --allow-same-version
+      fi
   script:
     - echo "==> Fetching pre-built Linux Python backend from registry..."
     - |
       BACKEND_VERSION="${CI_COMMIT_TAG:-dev-${CI_COMMIT_SHORT_SHA}}"
-      LINUX_BACKEND_URL="${CI_API_V4_URL}/projects/${BACKEND_PROJECT_ID}/packages/generic/pdf-extractor-backend/${BACKEND_VERSION}/pdf-extractor-backend-linux.tar.gz"
+      LINUX_BACKEND_URL="${CI_API_V4_URL}/projects/${BACKEND_PROJECT_ID}/packages/generic/pdf-textract-backend/${BACKEND_VERSION}/pdf-textract-backend-linux-${BACKEND_VERSION}.tar.gz"
       
       echo "DEBUG: Target Linux Registry URL is -> ${LINUX_BACKEND_URL}"
       
-      curl --fail --silent --show-error --header "JOB-TOKEN: $CI_JOB_TOKEN" --output /tmp/pdf-extractor-backend-linux.tar.gz "$LINUX_BACKEND_URL"
+      curl --fail --silent --show-error --header "JOB-TOKEN: $CI_JOB_TOKEN" --output /tmp/pdf-textract-backend-linux.tar.gz "$LINUX_BACKEND_URL"
       mkdir -p bin/linux/backend
-      tar xzf /tmp/pdf-extractor-backend-linux.tar.gz -C bin/linux/backend/
+      tar xzf /tmp/pdf-textract-backend-linux.tar.gz -C bin/linux/backend/
 
     - node scripts/download_tesseract.js --platform=linux
     - node scripts/download_tessdata.js
@@ -132,9 +142,110 @@ build-linux:
 #   into bin/mac/tesseract/ and their load paths are patched to be relative
 #   (@loader_path/...) so the bundled app works on machines without Homebrew.
 # ===========================================================================
+build-mac:
+  stage: build
+  # macOS Shell executor — no image: key (scripts run as bash on the host)
+  inherit:
+    default: false
+  tags:
+    - macos
+  cache:
+    key: "npm-mac-$CI_COMMIT_REF_SLUG"
+    paths:
+      - node_modules/
+    policy: pull-push
+  before_script:
+    # Append common Homebrew and system binary paths so the runner can locate Node/NPM
+    - export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+    
+    # Verify or dynamically resolve Node dependencies fallback
+    - |
+      if ! command -v node &> /dev/null; then
+        echo "Node.js not detected in PATH. Attempting to install via Homebrew..."
+        if ! command -v brew &> /dev/null; then
+          echo "ERROR: Homebrew is missing from the macOS runner host. Cannot proceed."
+          exit 1
+        fi
+        HOMEBREW_NO_AUTO_UPDATE=1 brew install node@20
+        export PATH="$(brew --prefix node@20)/bin:$PATH"
+      fi
+    - node --version
+    - npm --version
+    - npm ci --prefer-offline
+    - |
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        CLEAN_VERSION=$(echo "$CI_COMMIT_TAG" | sed 's/^v//')
+        npm version "$CLEAN_VERSION" --no-git-tag-version --allow-same-version
+      fi
+  script:
+    - export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+    
+    # ── macOS backend (pre-built from Package Registry) ──────────────────────
+    - echo "==> [1/6] Fetching macOS Python backend from Backend Package Registry..."
+    - |
+      BACKEND_VERSION="${CI_COMMIT_TAG:-dev-${CI_COMMIT_SHORT_SHA}}"
+      MAC_BACKEND_URL="${CI_API_V4_URL}/projects/${BACKEND_PROJECT_ID}/packages/generic/pdf-textract-backend/${BACKEND_VERSION}/pdf-textract-backend-mac-${BACKEND_VERSION}.tar.gz"
+      HTTP_CODE=$(curl --silent --output /dev/null --write-out "%{http_code}" \
+                       --header "JOB-TOKEN: $CI_JOB_TOKEN" "$MAC_BACKEND_URL")
+      if [ "$HTTP_CODE" = "200" ]; then
+        echo "Found pre-built macOS backend v${BACKEND_VERSION} — downloading..."
+        curl --fail --silent --show-error \
+             --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+             --output /tmp/pdf-textract-backend-mac.tar.gz \
+             "$MAC_BACKEND_URL"
+        mkdir -p bin/mac/backend
+        tar -xzf /tmp/pdf-textract-backend-mac.tar.gz -C bin/mac/backend/
+        echo "✓ macOS backend ready."
+      else
+        echo "ERROR: macOS backend not found in Package Registry (HTTP $HTTP_CODE)."
+        echo "Ensure you built the backend project with version tag: ${BACKEND_VERSION}"
+        exit 1
+      fi
+
+    # ── macOS Tesseract (install via Homebrew, copy & patch dylibs) ──────────
+    - echo "==> [2/6] Installing Tesseract via Homebrew safely..."
+    - HOMEBREW_NO_AUTO_UPDATE=1 brew install tesseract || true
+    - |
+      TESS_PREFIX=$(brew --prefix tesseract)
+      DEST=bin/mac/tesseract
+      mkdir -p "$DEST"
+      echo "Copying tesseract binary from $TESS_PREFIX/bin/tesseract..."
+      cp "$TESS_PREFIX/bin/tesseract" "$DEST/tesseract"
+      echo "Copying linked dylibs..."
+      for lib in $(otool -L "$TESS_PREFIX/bin/tesseract" | awk '/\/opt\/homebrew|\/usr\/local/{print $1}'); do
+        [ -f "$lib" ] && cp "$lib" "$DEST/" && echo "  Copied: $(basename $lib)"
+      done
+      for dylib in "$DEST"/*.dylib; do
+        for dep in $(otool -L "$dylib" | awk '/\/opt\/homebrew|\/usr\/local/{print $1}'); do
+          [ -f "$dep" ] && [ ! -f "$DEST/$(basename $dep)" ] && cp "$dep" "$DEST/" && echo "  Copied dep: $(basename $dep)"
+        done
+      done
+      chmod +x "$DEST/tesseract"
+    - echo "Patching dylib load paths to be self-contained..."
+    - node scripts/fix_mac_binaries.js
+
+    - echo "==> [3/6] Downloading Tessdata language models..."
+    - node scripts/download_tessdata.js
+
+    # ── Package macOS target ─────────────────────────────────────────────────
+    - echo "==> [4/6] Setting execute permissions on macOS binaries..."
+    - chmod -R +x bin/mac/
+
+    - echo "==> [5/6] Building Vite frontend..."
+    - npm run build
+
+    - echo "==> [6/6] Packaging Electron for macOS..."
+    - npx electron-builder --mac --publish=never
+  artifacts:
+    name: "pdf-extractor-mac-$CI_COMMIT_REF_SLUG"
+    expire_in: 30 days
+    paths:
+      - release/*.dmg
+      - release/*.zip
+
 
 # ===========================================================================
-# 3. Release Stage — Create GitLab Release on Git Tag
+# 4. Release Stage — Create GitLab Release on Git Tag
 # ===========================================================================
 release:
   stage: release
@@ -145,6 +256,8 @@ release:
     - job: build-win
       artifacts: true
     - job: build-linux
+      artifacts: true
+    - job: build-mac
       artifacts: true
   rules:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
@@ -158,11 +271,11 @@ release:
         curl --fail --silent --show-error \
              --header "JOB-TOKEN: $CI_JOB_TOKEN" \
              --upload-file "$f" \
-             "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/pdf-extractor/${CI_COMMIT_TAG}/${FILENAME}"
+             "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/pdf-textract/${CI_COMMIT_TAG}/${FILENAME}"
       done
     - echo "==> Creating GitLab Release for $CI_COMMIT_TAG..."
   release:
-    name: "PDF Extractor $CI_COMMIT_TAG"
+    name: "PDF Textract $CI_COMMIT_TAG"
     description: |
       Automated multi-platform release compiled in GitLab CI/CD.
 
@@ -181,17 +294,20 @@ release:
       links:
         # Note: Make sure these file patterns accurately match your electron-builder config settings!
         - name: "Windows Setup Installer (.exe)"
-          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/pdf-extractor/${CI_COMMIT_TAG}/PDF-Extractor-Setup.exe"
+          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/pdf-textract/${CI_COMMIT_TAG}/PDF-Textract-Setup-${CI_COMMIT_TAG}.exe"
           link_type: package
         - name: "Windows Portable (.zip)"
-          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/pdf-extractor/${CI_COMMIT_TAG}/PDF-Extractor-win.zip"
+          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/pdf-textract/${CI_COMMIT_TAG}/PDF-Textract-win-${CI_COMMIT_TAG}.zip"
           link_type: package
         - name: "Linux AppImage (.AppImage)"
-          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/pdf-extractor/${CI_COMMIT_TAG}/PDF-Extractor.AppImage"
+          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/pdf-textract/${CI_COMMIT_TAG}/PDF-Textract-${CI_COMMIT_TAG}.AppImage"
           link_type: package
         - name: "Linux Debian Package (.deb)"
-          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/pdf-extractor/${CI_COMMIT_TAG}/PDF-Extractor.deb"
+          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/pdf-textract/${CI_COMMIT_TAG}/PDF-Textract-${CI_COMMIT_TAG}.deb"
           link_type: package
         - name: "macOS Disk Image (.dmg)"
-          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/pdf-extractor/${CI_COMMIT_TAG}/PDF-Extractor.dmg"
+          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/pdf-textract/${CI_COMMIT_TAG}/PDF-Textract-${CI_COMMIT_TAG}.dmg"
+          link_type: package
+        - name: "macOS Portable (.zip)"
+          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/pdf-textract/${CI_COMMIT_TAG}/PDF-Textract-${CI_COMMIT_TAG}.zip"
           link_type: package

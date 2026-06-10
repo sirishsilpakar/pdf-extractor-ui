@@ -105,14 +105,14 @@ function startBackend() {
     const osDir =
       process.platform === "darwin" ? "mac" : process.platform === "win32" ? "win" : "linux"
     const exeName =
-      process.platform === "win32" ? "pdf-extractor-backend.exe" : "pdf-extractor-backend"
+      process.platform === "win32" ? "pdf-textract-backend.exe" : "pdf-textract-backend"
     backendPath = path.join(
       __dirname,
       "..",
       "bin",
       osDir,
       "backend",
-      "pdf-extractor-backend",
+      "pdf-textract-backend",
       exeName,
     )
     tesseractPath = path.join(
@@ -126,12 +126,12 @@ function startBackend() {
     tessdataPath = path.join(__dirname, "..", "bin", "tessdata")
   } else {
     const exeName =
-      process.platform === "win32" ? "pdf-extractor-backend.exe" : "pdf-extractor-backend"
+      process.platform === "win32" ? "pdf-textract-backend.exe" : "pdf-textract-backend"
     backendPath = path.join(
       process.resourcesPath,
       "bin",
       "backend",
-      "pdf-extractor-backend",
+      "pdf-textract-backend",
       exeName,
     )
     tesseractPath = path.join(

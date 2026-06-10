@@ -130,8 +130,8 @@ async function main() {
     console.log("PyInstaller build complete.");
 
     // 3. Move the compiled backend to frontend bin folder
-    const buildOutputSrc = path.join(backendDir, "dist", "pdf-extractor-backend");
-    const buildOutputDest = path.join(FRONTEND_BIN_BACKEND, "pdf-extractor-backend");
+    const buildOutputSrc = path.join(backendDir, "dist", "pdf-textract-backend");
+    const buildOutputDest = path.join(FRONTEND_BIN_BACKEND, "pdf-textract-backend");
 
     if (!fs.existsSync(buildOutputSrc)) {
       throw new Error(`Compiled backend not found at: ${buildOutputSrc}`);
