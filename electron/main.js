@@ -8,6 +8,7 @@ if (process.platform === "darwin") {
 
 import path from "path";
 import fs from "fs";
+import os from "os";
 import { fileURLToPath } from "url";
 import { spawn } from "child_process";
 import { ipcMain, dialog, shell } from "electron";
@@ -37,6 +38,33 @@ ipcMain.handle("show-item-in-folder", async (event, filePath) => {
   if (filePath) {
     shell.showItemInFolder(path.normalize(filePath));
   }
+});
+
+ipcMain.handle("get-backend-port", async () => {
+  const isDev = process.env.VITE_DEV_SERVER_URL !== undefined;
+  let portFilePath;
+  if (isDev) {
+    // Sibling backend directory: repo/pdf-extractor/port.json
+    portFilePath = path.join(__dirname, "../../pdf-extractor/port.json");
+    if (!fs.existsSync(portFilePath)) {
+      // Fallback: check project root or bin directory
+      portFilePath = path.join(__dirname, "../port.json");
+    }
+  } else {
+    // Production: ~/.pdf-extractor/port.json
+    portFilePath = path.join(os.homedir(), ".pdf-extractor", "port.json");
+  }
+
+  try {
+    if (fs.existsSync(portFilePath)) {
+      const data = fs.readFileSync(portFilePath, "utf8");
+      const config = JSON.parse(data);
+      return config.port;
+    }
+  } catch (err) {
+    console.error("Error reading port.json:", err);
+  }
+  return null;
 });
 
 const __filename = fileURLToPath(import.meta.url);
@@ -158,7 +186,7 @@ function startBackend() {
     BASE_DIR: baseDir,
     TESSERACT_CMD: tesseractPath,
     TESSDATA_PREFIX: tessdataPath,
-    SERVER_PORT: "8080",
+    SERVER_PORT: isDev ? "8080" : "0",
     SERVE_UI: "false", // headless mode
   }
 
@@ -173,7 +201,7 @@ function startBackend() {
     console.log("  LD_LIBRARY_PATH:", env.LD_LIBRARY_PATH)
   }
 
-  backendProcess = spawn(backendPath, ["--no-ui"], {
+  backendProcess = spawn(backendPath, {
     cwd: path.dirname(backendPath),
     env: env,
   })
@@ -189,7 +217,7 @@ function startBackend() {
     if (code !== 0 && code !== null) {
       dialog.showErrorBox(
         "Backend Process Exited",
-        `The backend process stopped unexpectedly (Code: ${code}).\nCheck if another app is using port 8080.`,
+        `The backend process stopped unexpectedly (Code: ${code}).\nPlease check the application logs for details.`,
       )
     }
     backendProcess = null

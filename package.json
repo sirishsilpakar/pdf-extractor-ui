@@ -46,7 +46,7 @@
   },
   "build": {
     "appId": "com.pdftextract.app",
-    "productName": "PDF Extractor tool",
+    "productName": "PDF Textract",
     "directories": {
       "buildResources": "assets",
       "output": "release"
@@ -69,6 +69,7 @@
           }
         ],  
     "mac": {
+      "artifactName": "PDF-Textract-v${version}.${ext}",
       "category": "public.app-category.productivity",
       "target": [
         {
@@ -88,6 +89,7 @@
       ]
     },
     "win": {
+      "artifactName": "PDF-Textract-win-v${version}.${ext}",
       "target": [
         {
           "target": "nsis",
@@ -96,16 +98,23 @@
           ]
         },
         {
-          "target": "portable"
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
         }
       ]
     },
+    "nsis": {
+      "artifactName": "PDF-Textract-Setup-v${version}.exe"
+    },
     "linux": {
+      "artifactName": "PDF-Textract-v${version}.${ext}",
       "target": [
         "AppImage",
         "deb"
       ],
-      "maintainer": "PDF Extractor Team <gurung@students.uni-marburg.de>",
+      "maintainer": "PDF Textract Team <gurung@students.uni-marburg.de>",
       "category": "Utility"
     }
   },

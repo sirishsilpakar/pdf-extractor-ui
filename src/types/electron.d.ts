@@ -7,6 +7,7 @@ declare global {
       openFolder: () => Promise<string>;
       openPath: (path: string) => Promise<void>;
       showItemInFolder: (path: string) => Promise<void>;
+      getBackendPort: () => Promise<number | null>;
     };
   }
 }

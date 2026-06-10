@@ -27,3 +27,5 @@ dist-ssr
 release
 bin
 tmp
+bin/*
+.env
