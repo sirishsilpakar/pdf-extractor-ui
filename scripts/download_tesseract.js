@@ -118,7 +118,7 @@ function extractArchive(filePath, destDir) {
         fs.cpSync(foundPath, destDir, { recursive: true });
         
         // Clean up the global install so the runner stays pristine
-        const uninstaller = path.join(foundPath, "Uninstall.exe");
+        const uninstaller = path.join(foundPath, "tesseract-uninstall.exe");
         if (fs.existsSync(uninstaller)) {
           console.log(`Cleaning up background global installation...`);
           try { execSync(`"${uninstaller}" /S`, { stdio: 'ignore' }); } catch (e) {}
@@ -166,11 +166,56 @@ function extractArchive(filePath, destDir) {
   }
   console.log("Extraction complete.");
 }
-
 async function main() {
   console.log(`=== Tesseract Binary Installer ===`);
   console.log(`Target Platform: ${targetPlatform} (${osDirName})`);
   console.log(`Destination Directory: ${DEST_DIR}`);
+
+  // Check if tesseract binary already exists locally
+  const exeName = targetPlatform === "win32" ? "tesseract.exe" : "tesseract";
+  const binPath = path.join(DEST_DIR, exeName);
+  if (fs.existsSync(binPath)) {
+    console.log(`Tesseract binary already exists locally at: ${binPath}`);
+    console.log("Skipping download and installation.");
+    process.exit(0);
+  }
+
+  // Check if tesseract binary exists globally on Windows and copy it
+  if (targetPlatform === "win32") {
+    console.log("Checking for global Tesseract installation to copy...");
+    const pfLocations = [
+      path.join(process.env.ProgramW6432 || "C:\\Program Files", "Tesseract-OCR"),
+      path.join(process.env.ProgramFiles || "C:\\Program Files", "Tesseract-OCR"),
+      path.join(process.env["ProgramFiles(x86)"] || "C:\\Program Files (x86)", "Tesseract-OCR"),
+      path.join(process.env.LOCALAPPDATA || "C:\\Users\\Default\\AppData\\Local", "Tesseract-OCR")
+    ];
+
+    let foundPath = null;
+    for (const loc of pfLocations) {
+      if (loc && fs.existsSync(path.join(loc, "tesseract.exe"))) {
+        foundPath = loc;
+        break;
+      }
+    }
+
+    if (foundPath) {
+      console.log(`Found global Tesseract installation at: ${foundPath}`);
+      console.log(`Copying binaries directly to local project folder: ${DEST_DIR}`);
+      if (!fs.existsSync(DEST_DIR)) {
+        fs.mkdirSync(DEST_DIR, { recursive: true });
+      }
+      fs.cpSync(foundPath, DEST_DIR, { recursive: true });
+      
+      // Clean up the installer Uninstall.exe if it got copied
+      try {
+        const localUninstaller = path.join(DEST_DIR, 'tesseract-uninstall.exe');
+        if (fs.existsSync(localUninstaller)) fs.unlinkSync(localUninstaller);
+      } catch (_) {}
+
+      console.log("Local Tesseract setup complete (copied from global installation).");
+      process.exit(0);
+    }
+  }
 
   // Create temporary workspace directory
   const tmpDir = path.resolve(__dirname, "..", "tmp");
