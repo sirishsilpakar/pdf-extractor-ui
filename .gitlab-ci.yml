@@ -298,6 +298,9 @@ release:
         - name: "Windows Setup Installer (.exe)"
           url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/pdf-textract/${CI_COMMIT_TAG}/PDF-Textract-Setup-${CI_COMMIT_TAG}.exe"
           link_type: package
+        - name: "Windows Standalone Executable (.exe)"
+          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/pdf-textract/${CI_COMMIT_TAG}/PDF-Textract-win-${CI_COMMIT_TAG}.exe"
+          link_type: package
         - name: "Windows Portable (.zip)"
           url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/pdf-textract/${CI_COMMIT_TAG}/PDF-Textract-win-${CI_COMMIT_TAG}.zip"
           link_type: package
