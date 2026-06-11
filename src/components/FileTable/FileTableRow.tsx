@@ -71,7 +71,7 @@ export const FileTableRow = React.memo(
               {pf.isReference ? "Reference" : "Pending"}
             </TableCell>
             <TableCell className="text-sm text-muted-foreground" role="cell">
-              {pf.size ? format.fileSize(pf.size) : "-" }
+              {size ? format.fileSize(size) : "-" }
             </TableCell>
             <TableCell role="cell">
               <div className="flex items-center gap-2">

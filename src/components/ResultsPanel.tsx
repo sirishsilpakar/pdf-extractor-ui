@@ -428,7 +428,7 @@ export function ResultsPanel({ runFilter, onRunFilterChange, onGetDetail, getDow
             {pages > 1 && (
               <div className="flex items-center justify-between p-4">
                 <p className="text-xs text-muted-foreground">
-                  Showing page {page} of {pages}
+                  Showing page {page} of {pages} ({total} files)
                 </p>
                 <div className="flex items-center gap-2">
                   <Button
