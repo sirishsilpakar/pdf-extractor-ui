@@ -109,6 +109,14 @@ export interface PendingFile {
   relPath?: string;
   refId?: string;
 }
+
+export type ReprocessModalData = {
+  fileHashes? : string[],
+  processedFileHashes?: string[],
+  totalFilesCount: number;
+  processedFilesCount: number;
+}
+
 export interface FilesListItem {
   content_hash: string;
   is_processed: boolean;

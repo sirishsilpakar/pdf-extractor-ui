@@ -279,11 +279,11 @@ const Index = () => {
           const alreadyHashes = Object.keys(checkData.already_processed || {});
 
           if (alreadyHashes.length > 0) {
-            store.setReprocessData({
-              hashes,
-              alreadyHashes,
-              totalItems: store.pendingFiles.length,
-              alreadyCount: alreadyHashes.length,
+            store.setReprocessModalData({
+              fileHashes,
+              processedFileHashes,
+              totalFilesCount: filesToUpload.length,
+              processedFilesCount: processedFileHashes.length,
             });
             store.setShowReprocessModal(true);
             return; // STOP HERE: wait for user decision in modal

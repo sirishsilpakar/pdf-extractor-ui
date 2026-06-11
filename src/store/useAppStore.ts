@@ -4,6 +4,7 @@ import type {
   LogEntry,
   NavView,
   PendingFile,
+  ReprocessModalData,
 } from "@/types";
 
 const defaultSettings: ProcessingSettings = {
@@ -57,11 +58,11 @@ interface PendingFilesState {
   setRegisteredPaths: (paths: { id: string; path: string; pdfCount: number; alreadyProcessedCount: number }[] | ((prev: { id: string; path: string; pdfCount: number; alreadyProcessedCount: number }[]) => { id: string; path: string; pdfCount: number; alreadyProcessedCount: number }[])) => void;
 }
 
-interface ReprocessState {
+interface ReprocessModalState {
   showReprocessModal: boolean;
   setShowReprocessModal: (val: boolean) => void;
-  reprocessData: { hashes: string[]; alreadyHashes: string[]; totalItems: number; alreadyCount: number } | null;
-  setReprocessData: (data: { hashes: string[]; alreadyHashes: string[]; totalItems: number; alreadyCount: number } | null) => void;
+  reprocessModalData: ReprocessModalData | null;
+  setReprocessModalData: (data: ReprocessModalData | null) => void;
 }
 
 interface SSEState {
@@ -89,7 +90,7 @@ interface SSEState {
   setEtaSeconds: (val: number | null) => void;
 }
 
-type AppState = UIState & SelectionState & SettingsState & LogState & PendingFilesState & ReprocessState & SSEState;
+type AppState = UIState & SelectionState & SettingsState & LogState & PendingFilesState & ReprocessModalState & SSEState;
 
 export const useAppStore = create<AppState>((set, get) => ({
   // UI State
@@ -167,8 +168,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Reprocess State
   showReprocessModal: false,
   setShowReprocessModal: (val) => set({ showReprocessModal: val }),
-  reprocessData: null,
-  setReprocessData: (data) => set({ reprocessData: data }),
+  reprocessModalData: null,
+  setReprocessModalData: (data) => set({ reprocessModalData: data }),
 
   // SSE State
   isProcessing: false,
