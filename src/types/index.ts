@@ -2,6 +2,10 @@ export type FileStatus = 'queued' | 'processing' | 'completed' | 'failed' | 'idl
 
 export type ExtractMethod = 'direct' | 'ocr' | 'error' | 'undefined';
 
+export type StateUpdater<T> = T | ((prev: T) => T);
+
+export type Setter<T> = (value: StateUpdater<T>) => void;
+
 export interface PDFFile {
   id: string;
   name: string;
@@ -97,6 +101,16 @@ export interface AbortController {
   abort: () => void;
 }
 
+export type RegisteredPath = {
+  batchId: string;
+  path: string;
+  pdfCount: number;
+  alreadyProcessedCount: number;
+  isFolder: boolean;
+  status: string;
+  filesScanned?: number;
+};
+
 export interface PendingFile {
   id: string;
   hash: string | null;
@@ -104,10 +118,10 @@ export interface PendingFile {
   absPath?: string;
   name?: string;
   size?: number;
-  isReference?: boolean;
-  isAlreadyRegistered?: boolean;
+  isPathReference?: boolean;
+  isAlreadyProcessed?: boolean;
   relPath?: string;
-  refId?: string;
+  batchId?: string;
 }
 
 export type ReprocessModalData = {

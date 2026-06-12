@@ -132,27 +132,30 @@ const Index = () => {
       });
       setDirError(null);
       return { ok: true };
-    } catch (err: any) {
-      setDirError(err.message);
+    } catch (err) {
+      const error = err as Error;
+      setDirError(error.message);
       if (showToast) {
         toast.error("Directory not writable", {
-          description: err.message,
+          description: error.message,
         });
       }
-      return { ok: false, error: err.message };
+      return { ok: false, error: error.message };
     }
   };
 
   // After we get job status done from Batch processing stream
-  const pendingFiles = useMemo(() => {
-    if (!batchStatusData?.items?.length) return [];
+  useEffect(() => {
+    if (!batchStatusData?.items?.length) return;
+
     const data = batchStatusData.items.map((f) => ({
-      id: f.content_hash,
+      id: crypto.randomUUID(),
+      batchId: f.batch_id,
       name: f.name,
       hash: f.content_hash,
       size: f.size_bytes,
       relPath: f.rel_path,
-      isAlreadyRegistered: true,
+      isAlreadyProcessed: f.is_processed,
     }));
     store.setPendingFiles(data);
   }, [batchStatusData]);
@@ -163,6 +166,9 @@ const Index = () => {
       f.name.toLowerCase().endsWith(".pdf"),
     );
     if (newFiles.length === 0) return;
+
+    setBatchId("");
+    store.setSkipProcessedFiles(false);
 
     const entries = newFiles.map((f) => {
       const absPath = (f as File & { path?: string }).path || "";
@@ -182,6 +188,8 @@ const Index = () => {
     store.setTotalFiles(entries.length);
     store.setCompletedFiles(0);
     store.setOverallProgress(0);
+    setPage(1);
+    setFilesPage(1);
     store.addLog(
       `Added ${entries.length} file(s). Calculating hashes...`,
       "info",
@@ -198,6 +206,9 @@ const Index = () => {
   };
 
   const handleRegisterPath = async (path: string) => {
+    setBatchId("");
+    store.setPendingFiles([]);
+    store.setSkipProcessedFiles(false);
     try {
       const res = await fetch(`${API_BASE}/batches`, {
         method: "POST",
@@ -218,11 +229,22 @@ const Index = () => {
 
       const data = await res.json();
       if (data.batch_id) {
+        setBatchId("");
+        store.setRegisteredPaths([{
+          batchId: data.batch_id,
+          path: data.resolved_path,
+          isFolder: data.is_folder,
+          status: data.scan_status,
+          pdfCount: data.pdf_count,
+          alreadyProcessedCount: data.already_processed_count,
+        }]);
         getBatchStatusStream();
         store.setTotalFiles(0);
         store.setCompletedFiles(0);
         store.setOverallProgress(0);
         store.setSkipProcessedFiles(false);
+        setPage(1);
+        setFilesPage(1);
       }
     } catch (e) {
       store.addLog(`Failed to register path: ${e}`, "error");
@@ -296,7 +318,7 @@ const Index = () => {
 
     // 1. Separate files to upload vs references
     const filesToUpload = store.pendingFiles.filter(
-      (pf) => !pf.isReference && pf.file,
+      (pf) => !pf.isPathReference && pf.file,
     );
     let uploadedIds: string[] = [];
 
@@ -330,17 +352,17 @@ const Index = () => {
       }
     }
 
-    // 2. Prepare selected_files payload for references
+    // Prepare selected_files payload for references
     const selectedFilesPayload: Record<string, string[]> = {};
-    if (store.registeredRefIds.length > 0) {
-      const refPending = store.pendingFiles.filter((pf) => pf.isReference);
+    if (store.registeredPaths.length > 0) {
+      const refPending = store.pendingFiles.filter((pf) => !pf.file);
       for (const pf of refPending) {
-        if (pf.refId) {
-          if (!selectedFilesPayload[pf.refId]) {
-            selectedFilesPayload[pf.refId] = [];
+        if (pf.batchId) {
+          if (!selectedFilesPayload[pf.batchId]) {
+            selectedFilesPayload[pf.batchId] = [];
           }
           if (pf.relPath) {
-            selectedFilesPayload[pf.refId].push(pf.relPath);
+            selectedFilesPayload[pf.batchId].push(pf.relPath);
           }
         }
       }
@@ -350,11 +372,11 @@ const Index = () => {
     // the file list to only the files actually queued for processing
     store.setSkipProcessedFiles(skipDuplicates);
 
-    // 3. Start Job
+    // Start Job
     startJob(
       {
         batch_id: batchId,
-        file_ids: [...uploadedIds, ...store.registeredRefIds],
+        file_ids: [...uploadedIds],
         selected_files:
           Object.keys(selectedFilesPayload).length > 0
             ? selectedFilesPayload
@@ -367,12 +389,13 @@ const Index = () => {
         onSuccess: () => {
           // Clear pending files to UI transition into dashboard
           store.setPendingFiles([]);
-          store.setRegisteredRefIds([]);
           store.setRegisteredPaths([]);
           setBatchId("");
+          setPage(1);
+          setFilesPage(1);
           store.addLog("Pipeline started successfully!", "success");
         },
-        onError: (error: any) => {
+        onError: (error: Error) => {
           store.addLog(`Failed to start job: ${error.message}`, "error");
           toast.error("Failed to start job", {
             description: error.message,
@@ -401,8 +424,8 @@ const Index = () => {
       <ReprocessModal
         open={store.showReprocessModal}
         onOpenChange={store.setShowReprocessModal}
-        alreadyCount={store.reprocessData?.alreadyCount || 0}
-        totalCount={store.reprocessData?.totalItems || 0}
+        processedCount={store.reprocessModalData?.processedFilesCount || 0}
+        totalCount={store.reprocessModalData?.totalFilesCount || 0}
         onSkip={() => {
           store.setShowReprocessModal(false);
           handleStartProcessing(false, true);

@@ -4,7 +4,9 @@ import type {
   LogEntry,
   NavView,
   PendingFile,
+  RegisteredPath,
   ReprocessModalData,
+  Setter,
 } from "@/types";
 
 const defaultSettings: ProcessingSettings = {
@@ -50,12 +52,10 @@ interface LogState {
 
 interface PendingFilesState {
   pendingFiles: PendingFile[];
-  setPendingFiles: (files: PendingFile[] | ((prev: PendingFile[]) => PendingFile[])) => void;
+  setPendingFiles: Setter<PendingFile[]>;
   removePendingFile: (id: string) => void;
-  registeredRefIds: string[];
-  setRegisteredRefIds: (ids: string[] | ((prev: string[]) => string[])) => void;
-  registeredPaths: { id: string; path: string; pdfCount: number; alreadyProcessedCount: number }[];
-  setRegisteredPaths: (paths: { id: string; path: string; pdfCount: number; alreadyProcessedCount: number }[] | ((prev: { id: string; path: string; pdfCount: number; alreadyProcessedCount: number }[]) => { id: string; path: string; pdfCount: number; alreadyProcessedCount: number }[])) => void;
+  registeredPaths: RegisteredPath[];
+  setRegisteredPaths: Setter<RegisteredPath[]>;
 }
 
 interface ReprocessModalState {
@@ -147,18 +147,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   })),
   removePendingFile: (id) => set((state) => ({
     pendingFiles: state.pendingFiles.filter((f) => f.id !== id),
-    registeredPaths: state.registeredPaths.filter((p) => {
-      if (p.id === id) {
-        // Also remove from ref ids
-        set({ registeredRefIds: state.registeredRefIds.filter(rid => rid !== p.id) });
-        return false;
-      }
-      return true;
-    })
-  })),
-  registeredRefIds: [],
-  setRegisteredRefIds: (idsOrFn) => set((state) => ({
-    registeredRefIds: typeof idsOrFn === "function" ? idsOrFn(state.registeredRefIds) : idsOrFn
+    // Todo: Implement to remove from registeredPath (backend)
   })),
   registeredPaths: [],
   setRegisteredPaths: (pathsOrFn) => set((state) => ({
