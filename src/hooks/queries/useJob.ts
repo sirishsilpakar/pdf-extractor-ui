@@ -58,7 +58,8 @@ export function useCancelJob() {
   return useMutation({
     mutationFn: () => fetcher("/job/cancel", { method: "POST" }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["job-status"] });
+      queryClient.invalidateQueries({ queryKey: ["runs"] });
+      queryClient.invalidateQueries({ queryKey: ["job-files"] });
     },
   });
 }
@@ -68,7 +69,7 @@ export function useStartJob() {
   return useMutation({
     mutationFn: (payload: {
       batch_id: string
-      file_ids: string[]
+      file_ids?: string[]
       selected_files: Record<string, string[]> | null
       force: boolean
       output_dir?: string
@@ -80,8 +81,8 @@ export function useStartJob() {
         body: JSON.stringify(payload),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["job-status"] });
       queryClient.invalidateQueries({ queryKey: ["runs"] });
+      queryClient.invalidateQueries({ queryKey: ["job-files"] });
     },
   });
 }

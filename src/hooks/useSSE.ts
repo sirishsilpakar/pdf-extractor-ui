@@ -14,6 +14,7 @@ function resetDashboard(state) {
   state.setProcessingFile("");
   state.setElapsedSeconds(0);
   state.setEtaSeconds(null);
+  state.setSkipProcessedFiles(false);
 }
 
 export function useSSE() {
@@ -59,11 +60,13 @@ export function useSSE() {
     }
 
     if (running) {
-      queryClient.invalidateQueries({ queryKey: ["job-files"] });
+      // Avoid query invalidations during active processing to prevent network storm requests
+      // Progress is pushed and updated via file_progress events
     } else {
       // Job just finished or is idle
       queryClient.invalidateQueries({ queryKey: ["runs"] });
       queryClient.invalidateQueries({ queryKey: ["results"] });
+      queryClient.invalidateQueries({ queryKey: ["job-files"] });
 
       if (data.status === "done" && data.total !== 0) {
         toast.success("Extraction is completed", { 
@@ -139,7 +142,6 @@ export function useSSE() {
           }
 
           if (progressData.pct === 100) {
-            queryClient.invalidateQueries({ queryKey: ["job-files"] });
             queryClient.invalidateQueries({ queryKey: ["results"] });
           }
           break;
