@@ -284,23 +284,31 @@ const Index = () => {
       }
     }
 
-    // 0. Duplicate Check
+    // Check for alreay processed files via file hash
     if (!force && !skipDuplicates) {
-      const hashes = store.pendingFiles
+
+      // For files selected to be uploaded (drag & drop), hash is generated on FE
+      // and this hash is checked against backend API response
+      const filesToUpload = store.pendingFiles.filter(
+        (pf) => !pf.isPathReference && pf.file,
+      );
+
+      const fileHashes = filesToUpload
         .map((p) => p.hash)
         .filter(Boolean) as string[];
-      if (hashes.length > 0) {
+
+      if (fileHashes.length > 0) {
         try {
           const checkRes = await fetch(`${API_BASE}/upload/check-hashes`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ hashes }),
+            body: JSON.stringify({ hashes: fileHashes }),
           });
           const checkData = await checkRes.json();
           // API returns already_processed as a dict, we want the keys
-          const alreadyHashes = Object.keys(checkData.already_processed || {});
+          const processedFileHashes = Object.keys(checkData.already_processed || {});
 
-          if (alreadyHashes.length > 0) {
+          if (processedFileHashes.length > 0) {
             store.setReprocessModalData({
               fileHashes,
               processedFileHashes,
@@ -314,9 +322,31 @@ const Index = () => {
           console.error("Duplicate check failed:", e);
         }
       }
+
+      // For files selected via path register (import buttons)
+      // batch event stream already responds with processed files count
+      // no need to hash in FE, this is checked in BE and sent as event response
+      const totalProcessedFiles = store.registeredPaths.reduce(
+        (sum, item) => sum + item.alreadyProcessedCount,
+        0
+      );
+
+      const totalFiles = store.registeredPaths.reduce(
+        (sum, item) => sum + item.pdfCount,
+        0
+      );
+
+      if (totalProcessedFiles > 0) {
+        store.setReprocessModalData({
+          totalFilesCount: totalFiles,
+          processedFilesCount: totalProcessedFiles
+        });
+        store.setShowReprocessModal(true);
+        return; // wait for user decision in modal
+      }
     }
 
-    // 1. Separate files to upload vs references
+    // Separate files to upload (if present)
     const filesToUpload = store.pendingFiles.filter(
       (pf) => !pf.isPathReference && pf.file,
     );
