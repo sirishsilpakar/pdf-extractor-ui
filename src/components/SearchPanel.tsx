@@ -182,7 +182,8 @@ export function SearchPanel({
       {pagination.total > 0 && (
         <div className="flex items-center justify-between px-2">
           <p className="text-xs text-muted-foreground">
-            Showing page {pagination.page} of {pagination.pages} ({pagination.total} result{pagination.total !== 1 ? 's' : ''})
+            Showing page {pagination.page} of {pagination.pages} ({pagination.total} result
+            {pagination.total !== 1 ? "s" : ""})
           </p>
           <div className="flex items-center gap-2">
             <Button

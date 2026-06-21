@@ -80,6 +80,9 @@ export function useSSE() {
           duration: 5000
         }); 
         resetDashboard(state);
+      } else if (data.status === "failed") {
+        toast.error("Extraction failed");
+        resetDashboard(state);
       }
     }
   }, [queryClient]);
@@ -118,8 +121,8 @@ export function useSSE() {
                   return { 
                     ...item, 
                     progress: progressData.pct,
-                    method: progressData.method,
-                    status: "processing",
+                    method: progressData.method || item.method,
+                    status: progressData.status || (progressData.pct === 100 ? "completed" : "processing"),
                     currentPage: progressData.page,
                     totalPages: progressData.total_pages
                   } as PDFFile;

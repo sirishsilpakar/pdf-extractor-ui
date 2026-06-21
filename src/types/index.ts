@@ -132,6 +132,7 @@ export type ReprocessModalData = {
 }
 
 export interface FilesListItem {
+  batch_id?: string;
   content_hash: string;
   is_processed: boolean;
   name: string;
@@ -160,10 +161,11 @@ export interface SSELogEvent {
 export interface SSEFileProgressEvent {
   type: 'file_progress';
   file: string;
-  method: string;
+  method?: ExtractMethod;
   pct: number;
   page?: number;
   total_pages?: number;
+  status?: FileStatus;
 }
 
 export type SSEEvent = SSEStateUpdateEvent | SSELogEvent | SSEFileProgressEvent;

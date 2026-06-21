@@ -147,16 +147,18 @@ export function FileTable({
         </Table>
       </div>
 
+      {totalPages > 0 && (
         <div className="flex items-center justify-between px-2">
           <p className="text-xs text-muted-foreground" aria-live="polite">
-            Showing page {currentPage} of {totalPages} ({allItems.length} total)
+            Showing page {currentPage} of {totalPages} ({serverPagination?.total} file
+            {serverPagination?.total > 1 ? "s" : ""})
           </p>
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
               onClick={() => serverOnPageChange(currentPage - 1)}
-              disabled={currentPage === 1}
+              disabled={currentPage <= 1}
               className="rounded-xl h-8 px-3 text-xs"
               aria-label="Previous page"
             >
@@ -166,7 +168,7 @@ export function FileTable({
               variant="outline"
               size="sm"
               onClick={() => serverOnPageChange(currentPage + 1)}
-              disabled={currentPage === totalPages}
+              disabled={currentPage >= totalPages}
               className="rounded-xl h-8 px-3 text-xs"
               aria-label="Next page"
             >
@@ -174,6 +176,7 @@ export function FileTable({
             </Button>
           </div>
         </div>
+      )}
     </div>
   );
 }
