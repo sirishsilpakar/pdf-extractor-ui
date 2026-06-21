@@ -209,6 +209,7 @@ const Index = () => {
     setBatchId("");
     store.setPendingFiles([]);
     store.setSkipProcessedFiles(false);
+    queryClient.removeQueries({ queryKey: ["batchStatus"] });
     try {
       const res = await fetch(`${API_BASE}/batches`, {
         method: "POST",
@@ -515,19 +516,30 @@ const Index = () => {
                   eventErr={false}
                 />
 
-                <FileTable
+                 <FileTable
                   files={store.isProcessing ? jobFiles?.items || [] : []}
                   pendingFiles={store.pendingFiles}
                   pagination={
-                    batchStatusData?.pagination || {
-                      page: 1,
-                      size: 10,
-                      total: 0,
-                      pages: 1,
-                    }
+                    store.isProcessing
+                      ? jobFiles?.pagination || {
+                          page: 1,
+                          size: 10,
+                          total: 0,
+                          pages: 1,
+                        }
+                      : (batchStatusData?.pagination || {
+                          page: 1,
+                          size: 10,
+                          total: 0,
+                          pages: 1,
+                        })
                   }
                   onPageChange={(p) => {
-                    setPage(p);
+                    if (store.isProcessing) {
+                      setFilesPage(p);
+                    } else {
+                      setPage(p);
+                    }
                   }}
                   selectedFiles={store.selectedFiles}
                   isLoading={isFilesLoading && store.isProcessing}
