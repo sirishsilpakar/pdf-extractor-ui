@@ -77,7 +77,7 @@ export function useSSE() {
               state.setResultsRunFilter(data.run_id);
             } 
           }, 
-          duration: 5000
+          duration: Infinity
         }); 
         resetDashboard(state);
       } else if (data.status === "failed") {
