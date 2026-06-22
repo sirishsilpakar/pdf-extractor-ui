@@ -23,6 +23,8 @@ interface FileTableProps {
   // Optional server-side pagination
   pagination?: PaginationState;
   onPageChange?: (page: number) => void;
+  isScanning?: boolean;
+  scannedCount?: number;
 }
 
 export function FileTable({
@@ -35,6 +37,8 @@ export function FileTable({
   pagination: serverPagination,
   onPageChange: serverOnPageChange,
   isLoading,
+  isScanning = false,
+  scannedCount = 0,
 }: FileTableProps & { isLoading?: boolean }) {
   const [sortConfig, setSortConfig] = useState<{ key: "name" | "status"; direction: "asc" | "desc" } | null>(null);
   const pageSize = serverPagination?.size || 10;
@@ -61,6 +65,23 @@ export function FileTable({
     ...pendingFiles.map(pf => ({ ...pf, isPending: true })),
     ...sortedFiles.map(f => ({ ...f, isPending: false }))
   ], [pendingFiles, sortedFiles]);
+
+  if (isScanning) {
+    return (
+      <div className="glass rounded-2xl p-8 flex flex-col items-center justify-center space-y-4 min-h-[300px]" role="status" aria-busy="true">
+        <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+        <div className="text-center space-y-2">
+          <h3 className="font-semibold text-base">Scanning Directory...</h3>
+          <p className="text-sm text-muted-foreground max-w-sm">
+            Searching for PDF files in the directory. Please wait.
+          </p>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium mt-2">
+            Found {scannedCount} PDF(s) so far
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!isLoading && files.length === 0 && pendingFiles.length === 0) {
     return <FileTableEmpty handleDrop={handleDrop} />;
@@ -117,14 +138,26 @@ export function FileTable({
           </TableHeader>
           <TableBody role="rowgroup">
             {isLoading ? (
-              Array.from({ length: 5 }).map((_, i) => (
+              Array.from({ length: pageSize }).map((_, i) => (
                 <TableRow key={`skeleton-${i}`} className="border-border/20">
-                  <TableCell><div className="h-6 w-20 bg-muted/20 animate-pulse rounded-lg" /></TableCell>
-                  <TableCell><div className="h-6 w-full max-w-[200px] bg-muted/20 animate-pulse rounded-lg" /></TableCell>
-                  <TableCell><div className="h-6 w-16 bg-muted/20 animate-pulse rounded-lg" /></TableCell>
-                  <TableCell><div className="h-6 w-12 bg-muted/20 animate-pulse rounded-lg" /></TableCell>
-                  <TableCell><div className="h-2 w-full bg-muted/20 animate-pulse rounded-full" /></TableCell>
-                  <TableCell><div className="h-8 w-8 bg-muted/20 animate-pulse rounded-lg" /></TableCell>
+                  <TableCell className="w-28">
+                    <div className="h-6 w-20 bg-muted/20 animate-pulse rounded-lg" />
+                  </TableCell>
+                  <TableCell className="min-w-[200px]">
+                    <div className="h-6 w-full max-w-[200px] bg-muted/20 animate-pulse rounded-lg" />
+                  </TableCell>
+                  <TableCell className="w-28">
+                    <div className="h-6 w-16 bg-muted/20 animate-pulse rounded-lg" />
+                  </TableCell>
+                  <TableCell className="w-24">
+                    <div className="h-6 w-12 bg-muted/20 animate-pulse rounded-lg" />
+                  </TableCell>
+                  <TableCell className="w-32">
+                    <div className="h-2 w-full bg-muted/20 animate-pulse rounded-full" />
+                  </TableCell>
+                  <TableCell className="w-20">
+                    <div className="h-8 w-8 bg-muted/20 animate-pulse rounded-lg" />
+                  </TableCell>
                 </TableRow>
               ))
             ) : (

@@ -67,8 +67,7 @@ export const FileTableRow = React.memo(
                 <span className="font-medium text-sm truncate max-w-[300px]">{name}</span>
               </div>
             </TableCell>
-            <TableCell className="text-xs text-muted-foreground italic" role="cell">
-              {pf.isReference ? "Reference" : "Pending"}
+            <TableCell className="text-xs text-muted-foreground italic" role="cell">Pending
             </TableCell>
             <TableCell className="text-sm text-muted-foreground" role="cell">
               {size ? format.fileSize(size) : "-" }

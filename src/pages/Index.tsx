@@ -15,7 +15,6 @@ import { getFilesFromDataTransfer } from "@/lib/fileDrop";
 import { hashFile } from "@/lib/hashing";
 import { useSSE } from "@/hooks/useSSE";
 import {
-  useJobStatus,
   useJobFiles,
   useCancelJob,
   useStartJob,
@@ -256,9 +255,34 @@ const Index = () => {
     const eventSource = new EventSource(BATCH_SSE_URL);
     eventSource.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      if (data.scan_status === "done") {
-        setBatchId(data.batch_id);
-        store.addLog(`Batch ready to process`, "info");
+      if (
+        data.scan_status === "scanning" ||
+        data.scan_status === "done" ||
+        data.scan_status === "error"
+      ) {
+        if (data.scan_status === "done") {
+          setBatchId(data.batch_id);
+          store.addLog(`Batch ready to process`, "info");
+        } else if (data.scan_status === "error") {
+          store.addLog(`Batch scan failed: ${data.error_message}`, "error");
+          toast.error("Batch scan failed", {
+            description: data.error_message || "An error occurred while scanning the directory.",
+          });
+        }
+        store.setRegisteredPaths((prev) =>
+          prev.map((item) =>
+            item.batchId === data.batch_id
+              ? {
+                  ...item,
+                  status: data.scan_status,
+                  pdfCount: data.pdf_count ?? item.pdfCount,
+                  alreadyProcessedCount: data.already_processed_count
+                      ?? item.alreadyProcessedCount,
+                  filesScanned: data.files_scanned ?? item.filesScanned
+                }
+              : item,
+          ),
+        );
       }
     };
     eventSource.onerror = () => {
@@ -562,6 +586,11 @@ const Index = () => {
                       handleAddFiles(e.dataTransfer.files);
                     }
                   }}
+                  isScanning={store.registeredPaths.some((p) => p.status === "scanning")}
+                  scannedCount={store.registeredPaths.reduce(
+                    (sum, p) => (p.status === "scanning" ? sum + p.filesScanned : sum),
+                    0,
+                  )}
                 />
 
                 <LogsPanel
