@@ -106,33 +106,53 @@ export function FileTable({
         onDragOver={(e) => e.preventDefault()}
         onDrop={handleDrop}
       >
-        <Table role="table">
+        <Table role="table" className="table-fixed w-full">
           <TableHeader>
             <TableRow className="border-border/50 hover:bg-transparent" role="row">
-              <TableHead 
+              <TableHead
                 role="columnheader"
-                className="w-28 cursor-pointer hover:text-primary transition-colors" 
+                className="w-28 cursor-pointer hover:text-primary transition-colors"
                 onClick={() => toggleSort("status")}
-                aria-sort={sortConfig?.key === "status" ? (sortConfig.direction === "asc" ? "ascending" : "descending") : "none"}
+                aria-sort={
+                  sortConfig?.key === "status"
+                    ? sortConfig.direction === "asc"
+                      ? "ascending"
+                      : "descending"
+                    : "none"
+                }
               >
                 <div className="flex items-center gap-1">
                   Status {sortConfig?.key === "status" && (sortConfig.direction === "asc" ? "↑" : "↓")}
                 </div>
               </TableHead>
-              <TableHead 
+              <TableHead
                 role="columnheader"
-                className="cursor-pointer hover:text-primary transition-colors min-w-[200px]" 
+                className="cursor-pointer hover:text-primary transition-colors min-w-[200px]"
                 onClick={() => toggleSort("name")}
-                aria-sort={sortConfig?.key === "name" ? (sortConfig.direction === "asc" ? "ascending" : "descending") : "none"}
+                aria-sort={
+                  sortConfig?.key === "name"
+                    ? sortConfig.direction === "asc"
+                      ? "ascending"
+                      : "descending"
+                    : "none"
+                }
               >
                 <div className="flex items-center gap-1">
                   File Name {sortConfig?.key === "name" && (sortConfig.direction === "asc" ? "↑" : "↓")}
                 </div>
               </TableHead>
-              <TableHead role="columnheader" className="w-28">Method</TableHead>
-              <TableHead role="columnheader" className="w-24">Size</TableHead>
-              <TableHead role="columnheader" className="w-32">Progress</TableHead>
-              <TableHead role="columnheader" className="w-20">Actions</TableHead>
+              <TableHead role="columnheader" className="w-28">
+                Method
+              </TableHead>
+              <TableHead role="columnheader" className="w-24">
+                Size
+              </TableHead>
+              <TableHead role="columnheader" className="w-32">
+                Progress
+              </TableHead>
+              <TableHead role="columnheader" className="w-20">
+                Actions
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody role="rowgroup">
