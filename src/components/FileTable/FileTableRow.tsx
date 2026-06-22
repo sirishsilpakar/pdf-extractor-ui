@@ -1,11 +1,12 @@
 import React from "react";
-import { Trash2, RotateCcw, FileText, FolderOpen } from "lucide-react";
+import { Trash2, RotateCcw, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { TableCell } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import type { PDFFile, PendingFile } from "@/types";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { format } from "@/utils/format";
 
 
@@ -56,8 +57,14 @@ export const FileTableRow = React.memo(
             <TableCell role="cell">
               <div className="flex items-center gap-2">
                   <FileText className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden="true" />
-                )}
-                <span className="font-medium text-sm truncate max-w-[300px]">{name}</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="font-medium text-sm truncate max-w-[300px] cursor-help">{name}</span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" align="start" className="text-xs max-w-[400px] break-all">
+                    {name}
+                  </TooltipContent>
+                </Tooltip>
               </div>
             </TableCell>
             <TableCell className="text-xs text-muted-foreground italic" role="cell">Pending
@@ -106,7 +113,14 @@ export const FileTableRow = React.memo(
           <TableCell role="cell">
             <div className="flex items-center gap-2">
               <FileText className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden="true" />
-              <span className="font-medium text-sm truncate max-w-[300px]">{file.name}</span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="font-medium text-sm truncate max-w-[300px] cursor-help">{file.name}</span>
+              </TooltipTrigger>
+              <TooltipContent side="top" align="start" className="text-xs max-w-[400px] break-all">
+                {file.name}
+              </TooltipContent>
+            </Tooltip>
             </div>
           </TableCell>
           <TableCell role="cell">

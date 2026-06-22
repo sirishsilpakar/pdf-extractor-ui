@@ -32,6 +32,7 @@ import { Input } from "@/components/ui/input";
 import { FolderOpen, Trash2, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isElectronAvailable, openFolder } from "@/lib/electron";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 
 const Index = () => {
   const store = useAppStore();
@@ -44,6 +45,8 @@ const Index = () => {
   const [batchId, setBatchId] = useState("");
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(10);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
 
   // Reset page on filter/query change
   useEffect(() => {

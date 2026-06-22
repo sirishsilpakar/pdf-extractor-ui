@@ -9,6 +9,7 @@ import {
 import type { NavView } from "@/types";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 const navItems: { id: NavView; label: string; icon: React.ElementType }[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -111,41 +112,53 @@ export function AppSidebar({ currentView, onViewChange, stats }: AppSidebarProps
         })}
       </nav>
 
-      <div className="p-3 border-t border-border/50">
+      <div className={cn("border-t border-border/50", sidebarCollapsed ? "p-1.5" : "p-3")}>
         {sidebarCollapsed ? (
-          <div className="p-2 border-b border-slate-800">
-            <div className="space-y-2">
-              <div className="flex items-center justify-center cursor-pointer">
-                <div
-                  className="size-8 bg-slate-800/50 rounded flex items-center justify-center"
-                  title={`Total: ${stats.total}`}
-                >
-                  <span className="text-xs font-bold text-slate-300">
-                    {stats.total}
-                  </span>
+          <div className="py-2 space-y-2 flex flex-col items-center">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center justify-center cursor-pointer w-full">
+                  <div className="min-w-8 max-w-12 h-8 px-1 bg-slate-800/50 rounded flex items-center justify-center">
+                    <span className="text-[10px] font-bold text-slate-300 truncate">
+                      {stats.total}
+                    </span>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center justify-center cursor-pointer">
-                <div
-                  className="size-8 bg-green-500/20 rounded flex items-center justify-center"
-                  title={`Completed: ${stats.completed}`}
-                >
-                  <span className="text-xs font-bold text-green-400">
-                    {stats.completed}
-                  </span>
+              </TooltipTrigger>
+              <TooltipContent side="right" align="center" className="text-xs">
+                Total Files: {stats.total}
+              </TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center justify-center cursor-pointer w-full">
+                  <div className="min-w-8 max-w-12 h-8 px-1 bg-green-500/20 rounded flex items-center justify-center">
+                    <span className="text-[10px] font-bold text-green-400 truncate">
+                      {stats.completed}
+                    </span>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center justify-center cursor-pointer">
-                <div
-                  className="size-8 bg-red-500/20 rounded flex items-center justify-center"
-                  title={`Processing: ${stats.failed}`}
-                >
-                  <span className="text-xs font-bold text-red-400">
-                    {stats.failed}
-                  </span>
+              </TooltipTrigger>
+              <TooltipContent side="right" align="center" className="text-xs">
+                Completed: {stats.completed}
+              </TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center justify-center cursor-pointer w-full">
+                  <div className="min-w-8 max-w-12 h-8 px-1 bg-red-500/20 rounded flex items-center justify-center">
+                    <span className="text-[10px] font-bold text-red-400 truncate">
+                      {stats.failed}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            </div>
+              </TooltipTrigger>
+              <TooltipContent side="right" align="center" className="text-xs">
+                Failed: {stats.failed}
+              </TooltipContent>
+            </Tooltip>
           </div>
         ) : (
           <div className="glass rounded-xl p-3 space-y-2">
