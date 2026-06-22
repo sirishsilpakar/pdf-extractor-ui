@@ -8,7 +8,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { AnimatePresence } from "framer-motion";
 import type { PDFFile, PendingFile, PaginationState } from "@/types";
 import { FileTableEmpty } from "./FileTableEmpty";
 import { FileTableRow } from "./FileTableRow";
@@ -161,20 +160,21 @@ export function FileTable({
                 </TableRow>
               ))
             ) : (
-              <AnimatePresence mode="popLayout">
-                {pagedItems.map((item) => {
-                  const key = 'isPending' in item && item.isPending ? (item as PendingFile).id : (item as PDFFile).id;
-                  return (
-                    <FileTableRow 
-                      key={key} 
-                      item={item as (PDFFile | PendingFile) & { isPending: boolean }} 
-                      isSelected={selectedFiles.has(key)} 
-                      onRemove={onRemove} 
-                      onRetry={onRetry} 
-                    />
-                  );
-                })}
-              </AnimatePresence>
+              pagedItems.map((item) => {
+                const key =
+                  "isPending" in item && item.isPending
+                    ? (item as PendingFile).id
+                    : (item as PDFFile).id;
+                return (
+                  <FileTableRow
+                    key={key}
+                    item={item as (PDFFile | PendingFile) & { isPending: boolean }}
+                    isSelected={selectedFiles.has(key)}
+                    onRemove={onRemove}
+                    onRetry={onRetry}
+                  />
+                );
+              })
             )}
           </TableBody>
         </Table>

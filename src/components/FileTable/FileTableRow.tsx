@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { TableCell } from "@/components/ui/table";
-import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import type { PDFFile, PendingFile } from "@/types";
 import { format } from "@/utils/format";
@@ -38,11 +37,8 @@ export const FileTableRow = React.memo(
         const size = pf.file ? pf.file.size : (pf.size || 0);
 
         return (
-          <motion.tr
+          <tr
             ref={ref}
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95 }}
             className="border-border/30 bg-secondary/10"
             role="row"
           >
@@ -59,9 +55,6 @@ export const FileTableRow = React.memo(
             </TableCell>
             <TableCell role="cell">
               <div className="flex items-center gap-2">
-                {pf.isReference ? (
-                  <FolderOpen className="h-4 w-4 text-primary shrink-0" aria-hidden="true" />
-                ) : (
                   <FileText className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden="true" />
                 )}
                 <span className="font-medium text-sm truncate max-w-[300px]">{name}</span>
@@ -88,7 +81,7 @@ export const FileTableRow = React.memo(
                 <Trash2 className="h-3.5 w-3.5" />
               </Button>
             </TableCell>
-          </motion.tr>
+          </tr>
         );
       }
 
@@ -96,11 +89,8 @@ export const FileTableRow = React.memo(
       const statusInfo = statusConfig[file.status] || { label: file.status, className: "bg-secondary" };
 
       return (
-        <motion.tr
+        <tr
           ref={ref}
-          initial={{ opacity: 0, y: -4 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, x: -20 }}
           className={cn(
             "border-border/30 transition-colors",
             file.status === "processing" && "bg-primary/5",
@@ -155,7 +145,7 @@ export const FileTableRow = React.memo(
               </Button>
             </div>
           </TableCell>
-        </motion.tr>
+        </tr>
       );
     }
   )
