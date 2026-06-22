@@ -19,10 +19,8 @@ import {
   useCancelJob,
   useStartJob,
 } from "@/hooks/queries/useJob";
-import { useRuns, useRunLog } from "@/hooks/queries/useRuns";
+import { useRuns } from "@/hooks/queries/useRuns";
 import {
-  useResults,
-  useResultDetail,
   getDownloadUrl,
 } from "@/hooks/queries/useResults";
 import { useSearch, useReindexSearch } from "@/hooks/queries/useSearch";
@@ -538,6 +536,7 @@ const Index = () => {
                   }}
                   onStart={() => handleStartProcessing()}
                   eventErr={false}
+                  onToggleSettings={() => setIsSettingsOpen(true)}
                 />
 
                  <FileTable
@@ -789,7 +788,22 @@ const Index = () => {
           applyAll={applyAll}
           onUpdate={store.updateSetting}
           onAllUpdate={handleAllUpdate}
+          className="hidden lg:flex"
         />
+
+        <Sheet open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+          <SheetContent side="right" className="p-0 w-80 border-l border-border/50 glass-strong">
+            <div className="h-full flex flex-col pt-10">
+              <SettingsPanel
+                settings={store.settings}
+                applyAll={applyAll}
+                onUpdate={store.updateSetting}
+                onAllUpdate={handleAllUpdate}
+                isSidebar={false}
+              />
+            </div>
+          </SheetContent>
+        </Sheet>
       </div>
     </div>
   );
