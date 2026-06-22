@@ -1,4 +1,4 @@
-import { Play, Square, Zap } from "lucide-react";
+import { Play, Sliders, Square, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { motion } from "framer-motion";
@@ -27,6 +27,7 @@ interface Props {
   etaSeconds?: number | null;
   onCancel: () => void;
   onStart: () => void;
+  onToggleSettings?: () => void;
 }
 
 export function ProcessingDashboard({
@@ -41,6 +42,7 @@ export function ProcessingDashboard({
   etaSeconds,
   onCancel,
   onStart,
+  onToggleSettings,
 }: Props) {
   const remaining = totalFiles - completedFiles;
   const [t, setT] = useState(0);
@@ -104,15 +106,26 @@ export function ProcessingDashboard({
         </div>
         <div className="flex items-center gap-1.5">
           {!isProcessing && (
-            <Button
-              size="sm"
-              className="rounded-xl gap-1 text-xs"
-              onClick={onStart}
-              disabled={pendingFilesCount === 0}
-              aria-label="Start Processing"
-            >
-              <Play className="h-3 w-3" aria-hidden="true" /> Start
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-xl gap-1 text-xs lg:hidden"
+                onClick={onToggleSettings}
+                aria-label="Configure Settings"
+              >
+                <Sliders className="h-3.5 w-3.5" aria-hidden="true" /> Configure
+              </Button>
+              <Button
+                size="sm"
+                className="rounded-xl gap-1 text-xs"
+                onClick={onStart}
+                disabled={pendingFilesCount === 0}
+                aria-label="Start Processing"
+              >
+                <Play className="h-3 w-3" aria-hidden="true" /> Start
+              </Button>
+            </>
           )}
           {isProcessing && (
             <AlertDialog>
