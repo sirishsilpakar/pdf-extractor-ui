@@ -4,13 +4,11 @@ import {
   Search,
   Settings,
   PanelRight,
-  Terminal,
   History,
-  ClipboardList
 } from "lucide-react";
 import type { NavView } from "@/types";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const navItems: { id: NavView; label: string; icon: React.ElementType }[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -20,19 +18,28 @@ const navItems: { id: NavView; label: string; icon: React.ElementType }[] = [
   { id: "settings", label: "Settings", icon: Settings },
 ];
 
-
 interface AppSidebarProps {
   currentView: NavView;
   onViewChange: (v: NavView) => void;
   stats: { total: number; completed: number; failed: number };
 }
 
-export function AppSidebar({
-  currentView,
-  onViewChange,
-  stats,
-}: AppSidebarProps) {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+export function AppSidebar({ currentView, onViewChange, stats }: AppSidebarProps) {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    return typeof window !== "undefined" && window.innerWidth < 1024;
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleResize = () => {
+      if (window.innerWidth < 1024) {
+        setSidebarCollapsed(true);
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   return (
     <aside
       className={`${sidebarCollapsed ? "w-16" : "w-56"} border-r border-border/50 glass flex flex-col shrink-0`}
@@ -63,24 +70,45 @@ export function AppSidebar({
             />
           )}
         </div>
-        {navItems.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => onViewChange(item.id)}
-            className={cn(
-              `w-full flex items-center ${sidebarCollapsed ? "px-2.5 py-2 rounded-md" : "gap-3 px-3 py-2.5 rounded-xl text-sm font-medium"} transition-none`,
-              currentView === item.id
-                ? "bg-primary text-primary-foreground shadow-glow"
-                : "text-muted-foreground hover:text-foreground hover:bg-secondary/80",
-            )}
-            title={item.label}
-          >
-            <item.icon
-              className={`${sidebarCollapsed ? "h-4 w-4" : "h-4 w-4"}`}
-            />
-            {sidebarCollapsed ? "" : item.label}
-          </button>
-        ))}
+        {navItems.map((item) => {
+          const button = (
+            <button
+              onClick={() => onViewChange(item.id)}
+              className={cn(
+                `w-full flex items-center ${sidebarCollapsed ? "px-2.5 py-2 rounded-md" : "gap-3 px-3 py-2.5 rounded-xl text-sm font-medium"} transition-none`,
+                currentView === item.id
+                  ? "bg-primary text-primary-foreground shadow-glow"
+                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/80",
+              )}
+            >
+              <item.icon className="h-4 w-4" />
+              {sidebarCollapsed ? "" : item.label}
+            </button>
+          );
+
+          return sidebarCollapsed ? (
+            <Tooltip key={item.id}>
+              <TooltipTrigger asChild>{button}</TooltipTrigger>
+              <TooltipContent side="right" align="center" className="text-xs">
+                {item.label}
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            <button
+              key={item.id}
+              onClick={() => onViewChange(item.id)}
+              className={cn(
+                `w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-none`,
+                currentView === item.id
+                  ? "bg-primary text-primary-foreground shadow-glow"
+                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/80",
+              )}
+            >
+              <item.icon className="h-4 w-4" />
+              {item.label}
+            </button>
+          );
+        })}
       </nav>
 
       <div className="p-3 border-t border-border/50">
@@ -131,15 +159,11 @@ export function AppSidebar({
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Done</span>
-                <span className="font-semibold text-success">
-                  {stats.completed}
-                </span>
+                <span className="font-semibold text-success">{stats.completed}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Failed</span>
-                <span className="font-semibold text-destructive">
-                  {stats.failed}
-                </span>
+                <span className="font-semibold text-destructive">{stats.failed}</span>
               </div>
             </div>
           </div>
