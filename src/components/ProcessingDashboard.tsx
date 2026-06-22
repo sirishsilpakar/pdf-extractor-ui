@@ -2,7 +2,6 @@ import { Play, Square, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { motion } from "framer-motion";
-import type { PDFFile } from "@/types";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -84,6 +83,11 @@ export function ProcessingDashboard({
   if (remaining > 0) {
     if (etaSeconds !== undefined && etaSeconds !== null) {
       etaStr = `~${etaSeconds}s`;
+    } else if (isProcessing && overallProgress > 0 && t > 0) {
+      const rate = overallProgress / t;
+      const remainingProgress = 100 - overallProgress;
+      const estEta = Math.round(remainingProgress / rate);
+      etaStr = `~${estEta}s`;
     } else {
       etaStr = "Calculating...";
     }
