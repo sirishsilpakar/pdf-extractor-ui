@@ -686,7 +686,7 @@ const Index = () => {
             )}
 
             {store.currentView === "settings" && (
-              <div className="glass rounded-2xl p-6 space-y-6">
+              <div className="glass rounded-2xl p-4 sm:p-6 space-y-6">
                 <div>
                   <h2 className="font-semibold text-lg flex items-center gap-2">
                     <span className="p-1.5 rounded-lg bg-primary/10 text-primary">
@@ -699,7 +699,7 @@ const Index = () => {
                   </p>
                 </div>
 
-                <div className="space-y-4 max-w-2xl bg-secondary/20 p-4 rounded-xl border border-border/40">
+                <div className="space-y-4 w-full bg-secondary/20 p-3 sm:p-4 rounded-xl border border-border/40">
                   <div className="flex items-start gap-2.5 text-xs text-muted-foreground">
                     <Info className="h-4 w-4 shrink-0 text-primary mt-0.5" />
                     <div>
@@ -715,7 +715,7 @@ const Index = () => {
                     <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
                       Target Folder Path
                     </label>
-                    <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2">
                       <Input
                         type="text"
                         placeholder="e.g. /Users/username/extracted_files"
@@ -728,45 +728,48 @@ const Index = () => {
                           await handleValidateDir(e.target.value);
                         }}
                         className={cn(
-                          "font-mono text-sm bg-background/50",
+                          "font-mono text-sm bg-background/50 flex-1",
                           dirError && "border-destructive focus-visible:ring-destructive"
                         )}
                       />
-                      {isElectronAvailable() && (
-                        <Button
-                          variant="secondary"
-                          onClick={async () => {
-                            const selectedPath = await openFolder();
-                            if (selectedPath) {
-                              store.setExtractionOutputDir(selectedPath);
-                              const res = await handleValidateDir(selectedPath);
-                              if (res.ok) {
-                                toast.success("Output directory updated", {
-                                  description: selectedPath,
-                                });
+                      <div className="flex gap-2 shrink-0 justify-end sm:justify-start">
+                        {isElectronAvailable() && (
+                          <Button
+                            variant="secondary"
+                            onClick={async () => {
+                              const selectedPath = await openFolder();
+                              if (selectedPath) {
+                                store.setExtractionOutputDir(selectedPath);
+                                const res = await handleValidateDir(selectedPath);
+                                if (res.ok) {
+                                  toast.success("Output directory updated", {
+                                    description: selectedPath,
+                                  });
+                                }
                               }
-                            }
-                          }}
-                          className="gap-1.5 shrink-0"
-                        >
-                          <FolderOpen className="h-4 w-4" />
-                          Select
-                        </Button>
-                      )}
-                      {store.extractionOutputDir && (
-                        <Button
-                          variant="ghost"
-                          onClick={() => {
-                            store.setExtractionOutputDir("");
-                            setDirError(null);
-                            toast.success("Reset to default output directory");
-                          }}
-                          className="shrink-0 text-muted-foreground hover:text-destructive"
-                          title="Reset to default"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
+                            }}
+                            className="gap-1.5 flex-1 sm:flex-initial"
+                          >
+                            <FolderOpen className="h-4 w-4" />
+                            Select
+                          </Button>
+                        )}
+                        {store.extractionOutputDir && (
+                          <Button
+                            variant="ghost"
+                            onClick={() => {
+                              store.setExtractionOutputDir("");
+                              setDirError(null);
+                              toast.success("Reset to default output directory");
+                            }}
+                            className="text-muted-foreground hover:text-destructive flex-1 sm:flex-initial justify-center gap-1.5"
+                            title="Reset to default"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            <span className="sm:hidden text-xs">Reset</span>
+                          </Button>
+                        )}
+                      </div>
                     </div>
                     {dirError && (
                       <p className="text-xs text-destructive font-medium mt-1">
@@ -778,7 +781,9 @@ const Index = () => {
 
                 <div className="border-t border-border/50 pt-4">
                   <p className="text-xs text-muted-foreground">
-                    Other processing settings (like header/footer removal) are configured using the control panel on the right.
+                    Other processing settings (like header/footer removal) are configured using the{" "}
+                    <span className="hidden lg:inline">control panel on the right.</span>
+                    <span className="inline lg:hidden">"Configure" button on the dashboard.</span>
                   </p>
                 </div>
               </div>
