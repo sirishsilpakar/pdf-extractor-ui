@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { AppSidebar } from "@/components/AppSidebar";
 import { ProcessingDashboard } from "@/components/ProcessingDashboard";
@@ -25,7 +25,7 @@ import {
 } from "@/hooks/queries/useResults";
 import { useSearch, useReindexSearch } from "@/hooks/queries/useSearch";
 import { API_BASE, BATCH_SSE_URL, fetcher } from "@/lib/api";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { FilesListItem, NavView, PaginationState, ProcessingSettings } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,6 +47,8 @@ const Index = () => {
   const [size, setSize] = useState(10);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
+  const queryClient = useQueryClient();
+  const batchEventSourceRef = useRef<EventSource | null>(null);
 
   // Reset page on filter/query change
   useEffect(() => {
@@ -61,6 +63,14 @@ const Index = () => {
       store.setCurrentView(localStorage.getItem('view') as NavView)
     }
   }, [])
+
+  useEffect(() => {
+    return () => {
+      if (batchEventSourceRef.current) {
+        batchEventSourceRef.current.close();
+      }
+    };
+  }, []);
 
   // Queries
   const { data: jobFiles, isPending: isFilesLoading } = useJobFiles(
@@ -253,7 +263,12 @@ const Index = () => {
   };
 
   const getBatchStatusStream = () => {
+    if (batchEventSourceRef.current) {
+      batchEventSourceRef.current.close();
+    }
     const eventSource = new EventSource(BATCH_SSE_URL);
+    batchEventSourceRef.current = eventSource;
+
     eventSource.onmessage = (event) => {
       const data = JSON.parse(event.data);
       if (
@@ -289,9 +304,9 @@ const Index = () => {
     eventSource.onerror = () => {
       store.addLog(`Event stream failed for batch processing.`, "success");
       eventSource.close();
-    };
-    return () => {
-      eventSource.close();
+      if (batchEventSourceRef.current === eventSource) {
+        batchEventSourceRef.current = null;
+      }
     };
   };
 
