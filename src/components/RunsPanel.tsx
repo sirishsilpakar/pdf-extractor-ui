@@ -139,7 +139,7 @@ export function RunsPanel({
                 </Button>
               </div>
             </div>
-            <div className="flex-1 overflow-auto p-6 bg-black/40 font-mono text-[11px] leading-relaxed no-scrollbar whitespace-pre-wrap selection:bg-primary/30">
+            <div className="flex-1 overflow-auto p-6 bg-black/40 font-mono text-[11px] leading-relaxed custom-scrollbar whitespace-pre-wrap selection:bg-primary/30">
               {viewingLog.content}
             </div>
           </div>

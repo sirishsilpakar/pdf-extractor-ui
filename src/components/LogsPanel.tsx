@@ -123,7 +123,7 @@ export function LogsPanel({ logs, autoscroll, onToggleAutoscroll }: Props) {
       </div>
       <div 
         ref={parentRef}
-        className="flex-1 px-4 py-2 overflow-y-auto no-scrollbar"
+        className="flex-1 px-4 py-2 overflow-y-auto custom-scrollbar"
         onScroll={handleScroll}
         aria-live="polite"
         role="log"
