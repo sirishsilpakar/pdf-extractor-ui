@@ -15,7 +15,8 @@ import {
   TriangleAlert,
   Ban,
   FileCog,
-  FolderOpen
+  FolderOpen,
+  RefreshCw
 } from "lucide-react";
 import type { Run, PaginationState } from "@/types";
 import { isElectronAvailable, openPath } from "../lib/electron";
@@ -23,6 +24,7 @@ import { ensureChildDir } from "@/lib/fs";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { format } from "@/utils/format";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface Props {
   runs: Run[];
@@ -60,6 +62,8 @@ export function RunsPanel({
     content: string;
   } | null>(null);
   const [loadingLog, setLoadingLog] = useState(false);
+
+  const queryClient = useQueryClient();
 
   const handleLoadLog = async (runId: string, runNumber?: number) => {
     setLoadingLog(true);
@@ -142,12 +146,26 @@ export function RunsPanel({
         </div>
       )}
 
-      <div className="flex items-center gap-2 px-1">
-        <History className="h-5 w-5 text-primary" />
-        <h2 className="text-lg font-semibold tracking-tight leading-none">Extraction History</h2>
-        <span className="text-xs text-muted-foreground font-medium bg-secondary px-2 py-0.5 rounded-full leading-none">
-          {pagination.total} runs
-        </span>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-1 shrink-0">
+        <div className="flex items-center gap-2">
+          <History className="h-5 w-5 text-primary" />
+          <h2 className="text-lg font-semibold tracking-tight leading-none">Extraction History</h2>
+          <span className="text-xs text-muted-foreground font-medium bg-secondary px-2 py-0.5 rounded-full leading-none">
+            {pagination.total} runs
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              queryClient.invalidateQueries({ queryKey: ["runs"] });
+            }}
+            className="gap-2 rounded-xl h-8 hover:bg-primary hover:text-white"
+          >
+            <RefreshCw className="h-4 w-4" /> Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Run cards */}
@@ -189,27 +207,27 @@ export function RunsPanel({
                 running: {
                   label: "Processing...",
                   color: "bg-primary/10 text-primary border-primary/30",
-                  icon: <FileCog width={12} height={12} className="mr-2" />
+                  icon: <FileCog width={12} height={12} className="mr-2" />,
                 },
                 completed: {
                   label: "Completed",
                   color: "bg-success/10 text-success border-success/30",
-                  icon: <CircleCheckBig width={12} height={12} className="mr-2" />
+                  icon: <CircleCheckBig width={12} height={12} className="mr-2" />,
                 },
                 failed: {
                   label: "Failed",
                   color: "bg-destructive/10 text-destructive border-destructive/30",
-                  icon: <Ban width={12} height={12} className="mr-2" />
+                  icon: <Ban width={12} height={12} className="mr-2" />,
                 },
                 cancelled: {
                   label: "Cancelled",
                   color: "bg-yellow-500/10 text-yellow-500 border-yellow-500/30",
-                  icon: <TriangleAlert width={12} height={12} className="mr-2" />
+                  icon: <TriangleAlert width={12} height={12} className="mr-2" />,
                 },
                 done: {
                   label: "Done",
                   color: "bg-green-500/10 text-green-700 border-success/30",
-                  icon: <CircleCheckBig width={12} height={12} className="mr-2" />
+                  icon: <CircleCheckBig width={12} height={12} className="mr-2" />,
                 },
               }[run.status] ?? {
                 label: run.status.toUpperCase(),
