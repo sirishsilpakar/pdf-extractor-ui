@@ -33,6 +33,8 @@ interface Props {
   onLoadRunLog: (runId: string) => Promise<string | null>;
   onPageChange: (page: number) => void;
   isLoading?: boolean;
+  isError?: boolean;
+  errorMessage?: string;
 }
 
 function fmtDuration(secs: number) {
@@ -55,6 +57,8 @@ export function RunsPanel({
   onLoadRunLog,
   onPageChange,
   isLoading,
+  isError = false,
+  errorMessage = "An error occurred while loading runs history.",
 }: Props) {
   const [viewingLog, setViewingLog] = useState<{
     id: string;
@@ -64,6 +68,40 @@ export function RunsPanel({
   const [loadingLog, setLoadingLog] = useState(false);
 
   const queryClient = useQueryClient();
+
+  if (isError) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 px-1">
+          <History className="h-5 w-5 text-primary" />
+          <h2 className="text-lg font-semibold tracking-tight">
+            Extraction History
+          </h2>
+        </div>
+        <div className="glass rounded-2xl p-8 flex flex-col items-center justify-center space-y-4 min-h-[300px] border-destructive/20 text-center" role="alert">
+          <div className="w-12 h-12 rounded-full bg-destructive/10 text-destructive flex items-center justify-center mx-auto">
+            <TriangleAlert className="h-6 w-6" />
+          </div>
+          <div className="space-y-2">
+            <h3 className="font-semibold text-base text-destructive">Failed to Load Runs</h3>
+            <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+              {errorMessage}
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              queryClient.invalidateQueries({ queryKey: ["runs"] });
+            }}
+            className="gap-2 rounded-xl h-8 hover:bg-primary hover:text-white"
+          >
+            <RefreshCw className="h-4 w-4" /> Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   const handleLoadLog = async (runId: string, runNumber?: number) => {
     setLoadingLog(true);

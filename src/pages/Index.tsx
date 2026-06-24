@@ -80,19 +80,17 @@ const Index = () => {
   }, []);
 
   // Queries
-  const { data: jobFiles, isPending: isFilesLoading } = useJobFiles(
-    filesPage,
-    10,
-    store.isProcessing,
-    store.skipProcessedFiles,
-    sortConfig,
-  );
-  const { data: runsData, isPending: isRunsLoading } = useRuns(runsPage, 10);
-  const { data: searchData, isPending: isSearchLoading } = useSearch(
-    store.searchQuery,
-    searchPage,
-    10,
-  );
+  const {
+    data: jobFiles,
+    isPending: isFilesLoading,
+    error: jobFilesError,
+  } = useJobFiles(filesPage, 10, store.isProcessing, store.skipProcessedFiles, sortConfig);
+  const { data: runsData, isPending: isRunsLoading, error: runsError } = useRuns(runsPage, 10);
+  const {
+    data: searchData,
+    isPending: isSearchLoading,
+    error: searchError,
+  } = useSearch(store.searchQuery, searchPage, 10);
 
   const {
     data: batchStatusData,
@@ -574,7 +572,7 @@ const Index = () => {
                   onToggleSettings={() => setIsSettingsOpen(true)}
                 />
 
-                 <FileTable
+                <FileTable
                   files={store.isProcessing ? jobFiles?.items || [] : []}
                   pendingFiles={store.pendingFiles}
                   pagination={
@@ -585,12 +583,12 @@ const Index = () => {
                           total: 0,
                           pages: 1,
                         }
-                      : (batchStatusData?.pagination || {
+                      : batchStatusData?.pagination || {
                           page: 1,
                           size: 10,
                           total: 0,
                           pages: 1,
-                        })
+                        }
                   }
                   onPageChange={(p) => {
                     if (store.isProcessing) {
@@ -609,9 +607,7 @@ const Index = () => {
                         (item) => item.webkitGetAsEntry()?.isDirectory,
                       );
                       if (hasFolder) {
-                        toast.error(
-                          "Folders are not supported. Please upload PDF files only.",
-                        );
+                        toast.error("Folders are not supported. Please upload PDF files only.");
                         return;
                       }
                       const files = await getFilesFromDataTransfer(e.dataTransfer.items);
@@ -632,9 +628,7 @@ const Index = () => {
                 <LogsPanel
                   logs={store.logs}
                   autoscroll={store.logsAutoscroll}
-                  onToggleAutoscroll={() =>
-                    store.setLogsAutoscroll(!store.logsAutoscroll)
-                  }
+                  onToggleAutoscroll={() => store.setLogsAutoscroll(!store.logsAutoscroll)}
                 />
               </>
             )}
@@ -666,6 +660,8 @@ const Index = () => {
                     return "Failed to load log.";
                   }
                 }}
+                isError={!!runsError}
+                errorMessage={runsError?.message || "Failed to load runs history."}
               />
             )}
 
@@ -688,9 +684,7 @@ const Index = () => {
             {store.currentView === "search" && (
               <SearchPanel
                 query={store.searchQuery}
-                results={
-                  store.searchQuery.trim() ? searchData?.items || [] : []
-                }
+                results={store.searchQuery.trim() ? searchData?.items || [] : []}
                 pagination={
                   store.searchQuery.trim()
                     ? searchData?.pagination || {
@@ -716,6 +710,8 @@ const Index = () => {
                   }
                 }}
                 getDownloadUrl={getDownloadUrl}
+                isError={!!searchError}
+                errorMessage={searchError?.message || "Search query failed."}
               />
             )}
 
@@ -739,8 +735,9 @@ const Index = () => {
                     <div>
                       <p className="font-medium text-foreground">Storage Resolution</p>
                       <p className="mt-0.5 text-muted-foreground">
-                        If left blank, files will be saved to the default <code className="px-1.5 py-0.5 rounded bg-secondary-foreground/10 text-foreground font-mono">extracted_files</code> directory.
-                        Providing an absolute path will write files directly to that folder.
+                        If left blank, files will be saved to the default <code className="px-1.5 py-0.5 rounded bg-secondary-foreground/10 text-foreground font-mono">
+                          extracted_files </code> directory. Providing an absolute path will write files directly to that
+                        folder.
                       </p>
                     </div>
                   </div>
@@ -763,7 +760,7 @@ const Index = () => {
                         }}
                         className={cn(
                           "font-mono text-sm bg-background/50 flex-1",
-                          dirError && "border-destructive focus-visible:ring-destructive"
+                          dirError && "border-destructive focus-visible:ring-destructive",
                         )}
                       />
                       <div className="flex gap-2 shrink-0 justify-end sm:justify-start">
@@ -806,9 +803,7 @@ const Index = () => {
                       </div>
                     </div>
                     {dirError && (
-                      <p className="text-xs text-destructive font-medium mt-1">
-                        {dirError}
-                      </p>
+                      <p className="text-xs text-destructive font-medium mt-1">{dirError}</p>
                     )}
                   </div>
                 </div>
