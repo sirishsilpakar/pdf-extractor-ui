@@ -106,9 +106,24 @@ export const FileTableRow = React.memo(
           role="row"
         >
           <TableCell role="cell">
-            <Badge variant="outline" className={cn("rounded-lg text-[10px] font-medium", statusInfo.className)}>
-              {statusInfo.label}
-            </Badge>
+            {file.message || file.error_message || file.flags ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="inline-block cursor-help">
+                    <Badge variant="outline" className={cn("rounded-lg text-[10px] font-medium", statusInfo.className)}>
+                      {statusInfo.label}
+                    </Badge>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="top" align="start" className="text-xs max-w-[300px]">
+                  {file.message || file.error_message || file.flags?.replace(/_/g, " ")}
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              <Badge variant="outline" className={cn("rounded-lg text-[10px] font-medium", statusInfo.className)}>
+                {statusInfo.label}
+              </Badge>
+            )}
           </TableCell>
           <TableCell role="cell">
             <div className="flex items-center gap-2">

@@ -54,17 +54,26 @@ const FileRow = ({
 
   return (
     <div className="flex items-center gap-3 pl-4 pr-6 py-2 hover:bg-secondary/20 transition-colors group h-[52px]">
-      <span
-        className="flex-1 text-sm font-medium truncate flex items-center gap-2"
-        title={r.rel_path}
-      >
-        <span>{fname}</span>
-        {showRunInfo && r.run_id && (
-          <span className="text-[10px] text-muted-foreground/50 font-normal shrink-0">
-            {r.run_id === "no-run" ? "Direct" : `Run #${r.run_number ?? r.run_id.slice(0, 8)}`}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="flex-1 text-sm font-medium truncate flex items-center gap-2 cursor-help">
+            <span className="truncate">{fname}</span>
+            {showRunInfo && r.run_id && (
+              <span className="text-[10px] text-muted-foreground/50 font-normal shrink-0">
+                {r.run_id === "no-run" ? "Direct" : `Run #${r.run_number ?? r.run_id.slice(0, 8)}`}
+              </span>
+            )}
           </span>
-        )}
-      </span>
+        </TooltipTrigger>
+        <TooltipContent side="top" align="start" className="text-xs max-w-[400px] break-all">
+          {r.rel_path}
+          {r.error_message && (
+            <div className="mt-1 text-destructive/85 font-mono text-[10px] border-t border-border/20 pt-1">
+              Error: {r.error_message}
+            </div>
+          )}
+        </TooltipContent>
+      </Tooltip>
       <Badge
         variant="outline"
         className={cn(
@@ -92,23 +101,48 @@ const FileRow = ({
         </span>
       )}
       <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity w-16 justify-end">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 rounded-lg hover:bg-primary hover:text-white"
-          onClick={() => onView(r)}
-          title="View text"
-        >
-          <Eye className="h-3.5 w-3.5" />
-        </Button>
-        <a
-          href={getDownloadUrl(r.id)}
-          download={`${fname}.txt`}
-          title="Download .txt"
-          className="inline-flex items-center justify-center h-7 w-7 rounded-lg transition-colors hover:bg-primary hover:text-white"
-        >
-          <Download className="h-3.5 w-3.5" />
-        </a>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 rounded-lg hover:bg-primary hover:text-white"
+              onClick={() => onView(r)}
+            >
+              <Eye className="h-3.5 w-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top" align="center" className="text-xs">
+            View text
+          </TooltipContent>
+        </Tooltip>
+        {r.method !== "error" ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <a
+                href={getDownloadUrl(r.id)}
+                download={`${fname}.txt`}
+                className="inline-flex items-center justify-center h-7 w-7 rounded-lg transition-colors hover:bg-primary hover:text-white"
+              >
+                <Download className="h-3.5 w-3.5" />
+              </a>
+            </TooltipTrigger>
+            <TooltipContent side="top" align="center" className="text-xs">
+              Download .txt
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center justify-center h-7 w-7 text-destructive cursor-help">
+                <AlertCircle className="h-4 w-4" />
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="top" align="end" className="text-xs max-w-[250px] font-normal">
+              {r.error_message || r.flags?.replace(/_/g, " ") || "File extraction failed"}
+            </TooltipContent>
+          </Tooltip>
+        )}
       </div>
     </div>
   );
