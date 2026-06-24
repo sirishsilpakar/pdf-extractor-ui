@@ -8,7 +8,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import type { PDFFile, PendingFile, PaginationState } from "@/types";
+import type { PDFFile, PendingFile, PaginationState, SortItem, SortField } from "@/types";
 import { FileTableEmpty } from "./FileTableEmpty";
 import { FileTableRow } from "./FileTableRow";
 

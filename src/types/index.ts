@@ -122,6 +122,7 @@ export interface PendingFile {
   isAlreadyProcessed?: boolean;
   relPath?: string;
   batchId?: string;
+  method?: string;
 }
 
 export type ReprocessModalData = {
@@ -138,6 +139,7 @@ export interface FilesListItem {
   name: string;
   rel_path: string;
   size_bytes: number;
+  method?: string;
 }
 
 export interface SSEStateUpdateEvent {
@@ -187,4 +189,11 @@ export interface ResultTreeResponse {
   size: number;
   pages: number;
   total: number;
+}
+
+export type SortField = "name" | "status" | "progress" | "method" | "size";
+
+export interface SortItem {
+  key: SortField;
+  direction: "asc" | "desc";
 }
