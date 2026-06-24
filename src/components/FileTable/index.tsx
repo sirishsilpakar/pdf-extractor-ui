@@ -24,6 +24,9 @@ interface FileTableProps {
   onPageChange?: (page: number) => void;
   isScanning?: boolean;
   scannedCount?: number;
+  // Optional server-side sorting
+  sortConfig?: SortItem[];
+  onSortChange?: (config: SortItem[]) => void;
 }
 
 export function FileTable({
@@ -38,11 +41,15 @@ export function FileTable({
   isLoading,
   isScanning = false,
   scannedCount = 0,
+  sortConfig,
+  onSortChange,
 }: FileTableProps & { isLoading?: boolean }) {
-  const [sortConfig, setSortConfig] = useState<{ key: "name" | "status"; direction: "asc" | "desc" } | null>(null);
+  const [localSortConfig, setLocalSortConfig] = useState<SortItem[]>([]);
   const pageSize = serverPagination?.size || 10;
 
   const currentPage = serverPagination?.page;
+
+  const activeSortConfig = onSortChange ? sortConfig : localSortConfig;
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -50,15 +57,33 @@ export function FileTable({
   }, [dropFiles]);
 
   const sortedFiles = useMemo(() => {
-    if (!sortConfig) return files;
+    if (onSortChange || !activeSortConfig || activeSortConfig.length === 0) return files;
     return [...files].sort((a, b) => {
-      const aVal = String(a[sortConfig.key] || "");
-      const bVal = String(b[sortConfig.key] || "");
-      return sortConfig.direction === "asc"
-        ? aVal.localeCompare(bVal)
-        : bVal.localeCompare(aVal);
+      for (const item of activeSortConfig) {
+        let diff = 0;
+        const dirMultiplier = item.direction === "asc" ? 1 : -1;
+        
+        if (item.key === "progress") {
+          const aVal = a.progress || 0;
+          const bVal = b.progress || 0;
+          diff = aVal - bVal;
+        } else if (item.key === "size") {
+          const aVal = a.size || 0;
+          const bVal = b.size || 0;
+          diff = aVal - bVal;
+        } else {
+          const aVal = String(a[item.key] || "");
+          const bVal = String(b[item.key] || "");
+          diff = aVal.localeCompare(bVal);
+        }
+        
+        if (diff !== 0) {
+          return diff * dirMultiplier;
+        }
+      }
+      return 0;
     });
-  }, [files, sortConfig]);
+  }, [files, activeSortConfig, onSortChange]);
 
   const allItems = useMemo(() => [
     ...pendingFiles.map(pf => ({ ...pf, isPending: true })),
@@ -80,6 +105,7 @@ export function FileTable({
         </div>
       </div>
     );
+
   }
 
   if (!isLoading && files.length === 0 && pendingFiles.length === 0) {
@@ -89,14 +115,61 @@ export function FileTable({
   const totalPages = serverPagination?.pages || Math.ceil(allItems.length / pageSize);
   const pagedItems = serverPagination ? allItems : allItems.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
-  const toggleSort = (key: "name" | "status") => {
-    setSortConfig(current => {
-      if (current?.key === key) {
-        if (current.direction === "asc") return { key, direction: "desc" };
-        return null;
+  const getSortDirection = (key: SortField) => {
+    const item = activeSortConfig?.find(s => s.key === key);
+    return item?.direction || null;
+  };
+
+  const renderSortIndicator = (key: SortField) => {
+    if (!activeSortConfig) return null;
+    const idx = activeSortConfig.findIndex(s => s.key === key);
+    if (idx === -1) return null;
+    
+    const item = activeSortConfig[idx];
+    const arrow = item.direction === "asc" ? "↑" : "↓";
+    const rank = activeSortConfig.length > 1 ? ` (${idx + 1})` : "";
+    return (
+      <span className="text-primary font-bold text-xs select-none">
+        {arrow}{rank}
+      </span>
+    );
+  };
+
+  const toggleSort = (key: SortField, isShift: boolean) => {
+    const currentList = activeSortConfig || [];
+    const existingIndex = currentList.findIndex(s => s.key === key);
+    
+    let nextList: SortItem[] = [];
+    
+    if (isShift) {
+      if (existingIndex !== -1) {
+        const item = currentList[existingIndex];
+        if (item.direction === "asc") {
+          nextList = currentList.map((s, idx) => idx === existingIndex ? { ...s, direction: "desc" as const } : s);
+        } else {
+          nextList = currentList.filter((_, idx) => idx !== existingIndex);
+        }
+      } else {
+        nextList = [...currentList, { key, direction: "asc" as const }];
       }
-      return { key, direction: "asc" };
-    });
+    } else {
+      if (existingIndex !== -1 && currentList.length === 1) {
+        const item = currentList[existingIndex];
+        if (item.direction === "asc") {
+          nextList = [{ key, direction: "desc" as const }];
+        } else {
+          nextList = [];
+        }
+      } else {
+        nextList = [{ key, direction: "asc" as const }];
+      }
+    }
+
+    if (onSortChange) {
+      onSortChange(nextList);
+    } else {
+      setLocalSortConfig(nextList);
+    }
   };
 
   return (
@@ -112,43 +185,82 @@ export function FileTable({
               <TableHead
                 role="columnheader"
                 className="w-28 cursor-pointer hover:text-primary transition-colors"
-                onClick={() => toggleSort("status")}
+                onClick={(e) => toggleSort("status", e.shiftKey)}
                 aria-sort={
-                  sortConfig?.key === "status"
-                    ? sortConfig.direction === "asc"
-                      ? "ascending"
-                      : "descending"
-                    : "none"
+                  getSortDirection("status") === "asc"
+                    ? "ascending"
+                    : getSortDirection("status") === "desc"
+                      ? "descending"
+                      : "none"
                 }
               >
-                <div className="flex items-center gap-1">
-                  Status {sortConfig?.key === "status" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+                <div className="flex items-center gap-1 select-none">
+                  Status {renderSortIndicator("status")}
                 </div>
               </TableHead>
               <TableHead
                 role="columnheader"
                 className="cursor-pointer hover:text-primary transition-colors min-w-[200px]"
-                onClick={() => toggleSort("name")}
+                onClick={(e) => toggleSort("name", e.shiftKey)}
                 aria-sort={
-                  sortConfig?.key === "name"
-                    ? sortConfig.direction === "asc"
-                      ? "ascending"
-                      : "descending"
-                    : "none"
+                  getSortDirection("name") === "asc"
+                    ? "ascending"
+                    : getSortDirection("name") === "desc"
+                      ? "descending"
+                      : "none"
                 }
               >
-                <div className="flex items-center gap-1">
-                  File Name {sortConfig?.key === "name" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+                <div className="flex items-center gap-1 select-none">
+                  File Name {renderSortIndicator("name")}
                 </div>
               </TableHead>
-              <TableHead role="columnheader" className="w-28">
-                Method
+              <TableHead
+                role="columnheader"
+                className="w-28 cursor-pointer hover:text-primary transition-colors"
+                onClick={(e) => toggleSort("method", e.shiftKey)}
+                aria-sort={
+                  getSortDirection("method") === "asc"
+                    ? "ascending"
+                    : getSortDirection("method") === "desc"
+                      ? "descending"
+                      : "none"
+                }
+              >
+                <div className="flex items-center gap-1 select-none">
+                  Method {renderSortIndicator("method")}
+                </div>
               </TableHead>
-              <TableHead role="columnheader" className="w-24">
-                Size
+              <TableHead
+                role="columnheader"
+                className="w-24 cursor-pointer hover:text-primary transition-colors"
+                onClick={(e) => toggleSort("size", e.shiftKey)}
+                aria-sort={
+                  getSortDirection("size") === "asc"
+                    ? "ascending"
+                    : getSortDirection("size") === "desc"
+                      ? "descending"
+                      : "none"
+                }
+              >
+                <div className="flex items-center gap-1 select-none">
+                  Size {renderSortIndicator("size")}
+                </div>
               </TableHead>
-              <TableHead role="columnheader" className="w-32">
-                Progress
+              <TableHead
+                role="columnheader"
+                className="w-32 cursor-pointer hover:text-primary transition-colors"
+                onClick={(e) => toggleSort("progress", e.shiftKey)}
+                aria-sort={
+                  getSortDirection("progress") === "asc"
+                    ? "ascending"
+                    : getSortDirection("progress") === "desc"
+                      ? "descending"
+                      : "none"
+                }
+              >
+                <div className="flex items-center gap-1 select-none">
+                  Progress {renderSortIndicator("progress")}
+                </div>
               </TableHead>
               <TableHead role="columnheader" className="w-20">
                 Actions
