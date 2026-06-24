@@ -11,10 +11,13 @@ import {
   RefreshCw,
   X,
   Loader2,
+  TriangleAlert,
+  AlertCircle,
 } from "lucide-react";
 import type { ExtractionResult, ExtractionResultDetail } from "@/types";
 import { cn } from "@/lib/utils";
 import { FileViewerModal } from "./FileViewerModal";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { useAllRunIds } from "@/hooks/queries/useRuns";
 import { useResultTree, useResultDirectoryFiles } from "@/hooks/queries/useResults";
 
@@ -64,22 +67,24 @@ const FileRow = ({
       </span>
       <Badge
         variant="outline"
-        className="rounded-md text-[9px] uppercase font-bold tracking-wider shrink-0 h-5"
+        className={cn(
+          "rounded-md text-[9px] uppercase font-bold tracking-wider shrink-0 h-5 w-14 flex items-center justify-center text-center",
+          r.method === "error" && "border-destructive/30 bg-destructive/10 text-destructive"
+        )}
       >
         {r.method || "?"}
       </Badge>
-      {confPct && (
-        <span
-          className={cn(
-            "text-[11px] font-semibold shrink-0 w-12 text-right",
-            highConf ? "text-success" : "text-destructive",
-          )}
-        >
-          {confPct}
-        </span>
-      )}
+      <span
+        className={cn(
+          "text-[11px] shrink-0 w-12 text-right",
+          r.method === "error" ? "text-muted-foreground font-normal" : "font-semibold",
+          r.method !== "error" && (highConf ? "text-success" : "text-destructive")
+        )}
+      >
+        {r.method === "error" ? "-" : (confPct || "-")}
+      </span>
       <span className="text-[11px] text-muted-foreground shrink-0 w-16 text-right">
-        {format.chars(r.char_count)}
+        {r.method === "error" ? "-" : format.chars(r.char_count)}
       </span>
       {dt && (
         <span className="text-[11px] text-muted-foreground shrink-0 hidden lg:block opacity-60 w-16 text-right">
@@ -260,7 +265,7 @@ export function ResultsPanel({ runFilter, onRunFilterChange, onGetDetail, getDow
     setTreePage(1);
   }, [runFilter]);
 
-  const { data: tree, isLoading } = useResultTree(runFilter, treePage, 20);
+  const { data: tree, isLoading, isError, error } = useResultTree(runFilter, treePage, 20);
 
   const directories = tree?.directories ?? [];
   const files = tree?.topLevelFiles ?? [];
@@ -388,6 +393,28 @@ export function ResultsPanel({ runFilter, onRunFilterChange, onGetDetail, getDow
               </div>
             </div>
           ))
+        ) : isError ? (
+          <div className="glass rounded-2xl p-8 flex flex-col items-center justify-center space-y-4 min-h-[300px] border-destructive/20 text-center" role="alert">
+            <div className="w-12 h-12 rounded-full bg-destructive/10 text-destructive flex items-center justify-center mx-auto">
+              <TriangleAlert className="h-6 w-6" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="font-semibold text-base text-destructive">Failed to Load Extracted Files</h3>
+              <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+                {error instanceof Error ? error.message : "An unexpected error occurred while loading results."}
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                queryClient.invalidateQueries({ queryKey: ["results"] });
+              }}
+              className="gap-2 rounded-xl h-8 hover:bg-primary hover:text-white"
+            >
+              <RefreshCw className="h-4 w-4" /> Retry
+            </Button>
+          </div>
         ) : (
           <div className="glass rounded-2xl overflow-hidden border border-border/50 flex flex-col divide-y divide-border/30">
             {directories.map((dir) => (

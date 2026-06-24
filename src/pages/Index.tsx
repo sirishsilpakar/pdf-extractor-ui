@@ -319,7 +319,14 @@ const Index = () => {
       }
     };
     eventSource.onerror = () => {
-      store.addLog(`Event stream failed for batch processing.`, "success");
+      store.addLog(`Event stream failed for batch processing.`, "error");
+      store.setRegisteredPaths((prev) =>
+        prev.map((item) =>
+          item.status === "scanning"
+            ? { ...item, status: "error" }
+            : item
+        )
+      );
       eventSource.close();
       if (batchEventSourceRef.current === eventSource) {
         batchEventSourceRef.current = null;
