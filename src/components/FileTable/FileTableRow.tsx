@@ -127,7 +127,7 @@ export const FileTableRow = React.memo(
             <span className="text-xs font-medium uppercase text-muted-foreground">{file.method}</span>
           </TableCell>
           <TableCell className="text-sm text-muted-foreground" role="cell">
-            {format.fileSize(file.size)}
+            {file.size && file.method !== "error" ? format.fileSize(file.size) : ""}
           </TableCell>
           <TableCell role="cell">
             <div className="flex items-center gap-2">
@@ -137,17 +137,6 @@ export const FileTableRow = React.memo(
           </TableCell>
           <TableCell role="cell">
             <div className="flex items-center gap-1">
-              {file.status === "failed" && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 rounded-lg"
-                  onClick={() => onRetry(file.id)}
-                  aria-label="Retry processing file"
-                >
-                  <RotateCcw className="h-3.5 w-3.5" />
-                </Button>
-              )}
               <Button
                 variant="ghost"
                 size="icon"

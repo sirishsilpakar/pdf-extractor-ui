@@ -181,6 +181,8 @@ const Index = () => {
       relPath: f.rel_path,
       isAlreadyProcessed: f.is_processed,
       method: f.method,
+      flags: f.flags,
+      error_message: f.error_message,
     }));
     store.setPendingFiles(data);
   }, [batchStatusData]);

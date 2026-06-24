@@ -47,6 +47,9 @@ export function useJobFiles(
         currentPage: f.current_page,
         relPath: f.rel_path,
         runId: f.run_id,
+        message: f.message,
+        flags: f.flags,
+        error_message: f.error_message,
       }));
       return {
         items,

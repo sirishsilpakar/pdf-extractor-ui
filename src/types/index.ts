@@ -23,6 +23,9 @@ export interface PDFFile {
   runId?: string;
   totalPages?: number;
   currentPage?: number;
+  message?: string;
+  flags?: string;
+  error_message?: string;
 }
 
 export interface Run {
@@ -78,6 +81,8 @@ export interface ExtractionResult {
   run_number?: number | null;
   txt_path?: string;
   has_duplicate?: boolean;
+  error_message?: string | null;
+  flags?: string | null;
 }
 
 /** Full record returned by GET /api/v1/results/{id} — includes extracted text */
@@ -140,6 +145,8 @@ export interface FilesListItem {
   rel_path: string;
   size_bytes: number;
   method?: string;
+  flags?: string | null;
+  error_message?: string | null;
 }
 
 export interface SSEStateUpdateEvent {
