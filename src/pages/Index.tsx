@@ -530,8 +530,8 @@ const Index = () => {
         <AppSidebar
           currentView={store.currentView}
           onViewChange={(v) => {
-              localStorage.setItem('view', v)
-              store.setCurrentView(v);
+            localStorage.setItem("view", v);
+            store.setCurrentView(v);
           }}
           stats={{
             total: store.totalFiles,
@@ -616,13 +616,24 @@ const Index = () => {
                       handleAddFiles(e.dataTransfer.files);
                     }
                   }}
-                  isScanning={store.registeredPaths.some((p) => p.status === "scanning")}
+                  isScanning={
+                    store.registeredPaths.some((p) => p.status === "scanning") ||
+                    (!!batchId && isBatchStatusPending)
+                  }
                   scannedCount={store.registeredPaths.reduce(
-                    (sum, p) => (p.status === "scanning" ? sum + p.filesScanned : sum),
+                    (sum, p) => sum + (p.status === "scanning" ? p.filesScanned : p.pdfCount || 0),
                     0,
                   )}
                   sortConfig={sortConfig}
                   onSortChange={setSortConfig}
+                  isError={
+                    (store.isProcessing && !!jobFilesError) ||
+                    (!store.isProcessing && !!batchStatusError)
+                  }
+                  errorMessage={
+                    (store.isProcessing ? jobFilesError?.message : batchStatusError?.message) ||
+                    "An error occurred while loading files."
+                  }
                 />
 
                 <LogsPanel

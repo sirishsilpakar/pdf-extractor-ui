@@ -8,6 +8,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { AlertCircle } from "lucide-react";
 import type { PDFFile, PendingFile, PaginationState, SortItem, SortField } from "@/types";
 import { FileTableEmpty } from "./FileTableEmpty";
 import { FileTableRow } from "./FileTableRow";
@@ -27,6 +28,8 @@ interface FileTableProps {
   // Optional server-side sorting
   sortConfig?: SortItem[];
   onSortChange?: (config: SortItem[]) => void;
+  isError?: boolean;
+  errorMessage?: string;
 }
 
 export function FileTable({
@@ -43,6 +46,8 @@ export function FileTable({
   scannedCount = 0,
   sortConfig,
   onSortChange,
+  isError = false,
+  errorMessage = "An error occurred while loading files.",
 }: FileTableProps & { isLoading?: boolean }) {
   const [localSortConfig, setLocalSortConfig] = useState<SortItem[]>([]);
   const pageSize = serverPagination?.size || 10;
@@ -89,6 +94,22 @@ export function FileTable({
     ...pendingFiles.map(pf => ({ ...pf, isPending: true })),
     ...sortedFiles.map(f => ({ ...f, isPending: false }))
   ], [pendingFiles, sortedFiles]);
+
+  if (isError) {
+    return (
+      <div className="glass rounded-2xl p-8 flex flex-col items-center justify-center space-y-4 min-h-[300px] border-destructive/20 text-center" role="alert">
+        <div className="w-12 h-12 rounded-full bg-destructive/10 text-destructive flex items-center justify-center mx-auto">
+          <AlertCircle className="h-6 w-6" />
+        </div>
+        <div className="space-y-2">
+          <h3 className="font-semibold text-base text-destructive">Failed to Load Files</h3>
+          <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+            {errorMessage}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (isScanning) {
     return (
