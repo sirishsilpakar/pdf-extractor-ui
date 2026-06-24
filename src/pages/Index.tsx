@@ -26,7 +26,7 @@ import {
 import { useSearch, useReindexSearch } from "@/hooks/queries/useSearch";
 import { API_BASE, BATCH_SSE_URL, fetcher } from "@/lib/api";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { FilesListItem, NavView, PaginationState, ProcessingSettings } from "@/types";
+import { FilesListItem, NavView, PaginationState, ProcessingSettings, SortItem } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FolderOpen, Trash2, Info } from "lucide-react";
@@ -46,6 +46,7 @@ const Index = () => {
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(10);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [sortConfig, setSortConfig] = useState<SortItem[]>([]);
 
   const queryClient = useQueryClient();
   const batchEventSourceRef = useRef<EventSource | null>(null);
@@ -57,6 +58,12 @@ const Index = () => {
   useEffect(() => {
     setSearchPage(1);
   }, [store.searchQuery]);
+
+  // Reset pagination on sort change
+  useEffect(() => {
+    setPage(1);
+    setFilesPage(1);
+  }, [sortConfig]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -77,7 +84,8 @@ const Index = () => {
     filesPage,
     10,
     store.isProcessing,
-    store.skipProcessedFiles
+    store.skipProcessedFiles,
+    sortConfig,
   );
   const { data: runsData, isPending: isRunsLoading } = useRuns(runsPage, 10);
   const { data: searchData, isPending: isSearchLoading } = useSearch(
@@ -91,13 +99,21 @@ const Index = () => {
     isPending: isBatchStatusPending,
     error: batchStatusError,
   } = useQuery({
-    queryKey: ["batchStatus", batchId, page, size, store.skipProcessedFiles],
+    queryKey: ["batchStatus", batchId, page, size, store.skipProcessedFiles, sortConfig],
     enabled: !!batchId,
     queryFn: async () => {
       // Forward the skip decision so the endpoint returns only the files
       // the pipeline will actually process, giving the correct total count
       const skipParam = store.skipProcessedFiles ? "&skip_processed=true" : "";
-      const url = `/batches/${batchId}/files?page=${page}&size=${size}${skipParam}`;
+      
+      let sortParam = "";
+      if (sortConfig && sortConfig.length > 0) {
+        const sortBy = sortConfig.map(s => s.key).join(",");
+        const sortOrder = sortConfig.map(s => s.direction).join(",");
+        sortParam = `&sort_by=${sortBy}&sort_order=${sortOrder}`;
+      }
+      
+      const url = `/batches/${batchId}/files?page=${page}&size=${size}${skipParam}${sortParam}`;
       const data = await fetcher<{
         items: FilesListItem[];
         page: number;
@@ -166,6 +182,7 @@ const Index = () => {
       size: f.size_bytes,
       relPath: f.rel_path,
       isAlreadyProcessed: f.is_processed,
+      method: f.method,
     }));
     store.setPendingFiles(data);
   }, [batchStatusData]);
@@ -608,6 +625,8 @@ const Index = () => {
                     (sum, p) => (p.status === "scanning" ? sum + p.filesScanned : sum),
                     0,
                   )}
+                  sortConfig={sortConfig}
+                  onSortChange={setSortConfig}
                 />
 
                 <LogsPanel
