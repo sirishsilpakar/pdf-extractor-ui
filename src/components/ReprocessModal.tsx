@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  alreadyCount: number;
+  processedCount: number;
   totalCount: number;
   onSkip: () => void;
   onReprocess: () => void;
@@ -21,7 +21,7 @@ interface Props {
 export function ReprocessModal({
   open,
   onOpenChange,
-  alreadyCount,
+  processedCount,
   totalCount,
   onSkip,
   onReprocess,
@@ -33,7 +33,7 @@ export function ReprocessModal({
         <AlertDialogHeader>
           <AlertDialogTitle>Already Processed Files</AlertDialogTitle>
           <AlertDialogDescription className="text-sm">
-            {alreadyCount} of {totalCount} file(s) have already been extracted. 
+            {processedCount} of {totalCount} file(s) have already been extracted. 
             What would you like to do?
           </AlertDialogDescription>
         </AlertDialogHeader>

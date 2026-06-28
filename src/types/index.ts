@@ -2,6 +2,10 @@ export type FileStatus = 'queued' | 'processing' | 'completed' | 'failed' | 'idl
 
 export type ExtractMethod = 'direct' | 'ocr' | 'error' | 'undefined';
 
+export type StateUpdater<T> = T | ((prev: T) => T);
+
+export type Setter<T> = (value: StateUpdater<T>) => void;
+
 export interface PDFFile {
   id: string;
   name: string;
@@ -19,6 +23,9 @@ export interface PDFFile {
   runId?: string;
   totalPages?: number;
   currentPage?: number;
+  message?: string;
+  flags?: string;
+  error_message?: string;
 }
 
 export interface Run {
@@ -74,6 +81,8 @@ export interface ExtractionResult {
   run_number?: number | null;
   txt_path?: string;
   has_duplicate?: boolean;
+  error_message?: string | null;
+  flags?: string | null;
 }
 
 /** Full record returned by GET /api/v1/results/{id} — includes extracted text */
@@ -97,6 +106,16 @@ export interface AbortController {
   abort: () => void;
 }
 
+export type RegisteredPath = {
+  batchId: string;
+  path: string;
+  pdfCount: number;
+  alreadyProcessedCount: number;
+  isFolder: boolean;
+  status: string;
+  filesScanned?: number;
+};
+
 export interface PendingFile {
   id: string;
   hash: string | null;
@@ -104,17 +123,30 @@ export interface PendingFile {
   absPath?: string;
   name?: string;
   size?: number;
-  isReference?: boolean;
-  isAlreadyRegistered?: boolean;
+  isPathReference?: boolean;
+  isAlreadyProcessed?: boolean;
   relPath?: string;
-  refId?: string;
+  batchId?: string;
+  method?: string;
 }
+
+export type ReprocessModalData = {
+  fileHashes? : string[],
+  processedFileHashes?: string[],
+  totalFilesCount: number;
+  processedFilesCount: number;
+}
+
 export interface FilesListItem {
+  batch_id?: string;
   content_hash: string;
   is_processed: boolean;
   name: string;
   rel_path: string;
   size_bytes: number;
+  method?: string;
+  flags?: string | null;
+  error_message?: string | null;
 }
 
 export interface SSEStateUpdateEvent {
@@ -138,10 +170,11 @@ export interface SSELogEvent {
 export interface SSEFileProgressEvent {
   type: 'file_progress';
   file: string;
-  method: string;
+  method?: ExtractMethod;
   pct: number;
   page?: number;
   total_pages?: number;
+  status?: FileStatus;
 }
 
 export type SSEEvent = SSEStateUpdateEvent | SSELogEvent | SSEFileProgressEvent;
@@ -163,4 +196,11 @@ export interface ResultTreeResponse {
   size: number;
   pages: number;
   total: number;
+}
+
+export type SortField = "name" | "status" | "progress" | "method" | "size";
+
+export interface SortItem {
+  key: SortField;
+  direction: "asc" | "desc";
 }

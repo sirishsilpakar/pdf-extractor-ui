@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { AppSidebar } from "@/components/AppSidebar";
 import { ProcessingDashboard } from "@/components/ProcessingDashboard";
@@ -15,26 +15,24 @@ import { getFilesFromDataTransfer } from "@/lib/fileDrop";
 import { hashFile } from "@/lib/hashing";
 import { useSSE } from "@/hooks/useSSE";
 import {
-  useJobStatus,
   useJobFiles,
   useCancelJob,
   useStartJob,
 } from "@/hooks/queries/useJob";
-import { useRuns, useRunLog } from "@/hooks/queries/useRuns";
+import { useRuns } from "@/hooks/queries/useRuns";
 import {
-  useResults,
-  useResultDetail,
   getDownloadUrl,
 } from "@/hooks/queries/useResults";
 import { useSearch, useReindexSearch } from "@/hooks/queries/useSearch";
 import { API_BASE, BATCH_SSE_URL, fetcher } from "@/lib/api";
-import { useQuery } from "@tanstack/react-query";
-import { FilesListItem, NavView, PaginationState, ProcessingSettings } from "@/types";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { FilesListItem, NavView, PaginationState, ProcessingSettings, SortItem } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FolderOpen, Trash2, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isElectronAvailable, openFolder } from "@/lib/electron";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 
 const Index = () => {
   const store = useAppStore();
@@ -47,6 +45,11 @@ const Index = () => {
   const [batchId, setBatchId] = useState("");
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(10);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [sortConfig, setSortConfig] = useState<SortItem[]>([]);
+
+  const queryClient = useQueryClient();
+  const batchEventSourceRef = useRef<EventSource | null>(null);
 
   // Reset page on filter/query change
   useEffect(() => {
@@ -56,38 +59,59 @@ const Index = () => {
     setSearchPage(1);
   }, [store.searchQuery]);
 
+  // Reset pagination on sort change
+  useEffect(() => {
+    setPage(1);
+    setFilesPage(1);
+  }, [sortConfig]);
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       store.setCurrentView(localStorage.getItem('view') as NavView)
     }
   }, [])
 
+  useEffect(() => {
+    return () => {
+      if (batchEventSourceRef.current) {
+        batchEventSourceRef.current.close();
+      }
+    };
+  }, []);
+
   // Queries
-  const { data: jobFiles, isPending: isFilesLoading } = useJobFiles(
-    filesPage,
-    10,
-    store.isProcessing,
-    store.skipProcessedFiles
-  );
-  const { data: runsData, isPending: isRunsLoading } = useRuns(runsPage, 10);
-  const { data: searchData, isPending: isSearchLoading } = useSearch(
-    store.searchQuery,
-    searchPage,
-    10,
-  );
+  const {
+    data: jobFiles,
+    isPending: isFilesLoading,
+    error: jobFilesError,
+  } = useJobFiles(filesPage, 10, store.isProcessing, store.skipProcessedFiles, sortConfig);
+  const { data: runsData, isPending: isRunsLoading, error: runsError } = useRuns(runsPage, 10);
+  const {
+    data: searchData,
+    isPending: isSearchLoading,
+    error: searchError,
+  } = useSearch(store.searchQuery, searchPage, 10);
 
   const {
     data: batchStatusData,
     isPending: isBatchStatusPending,
     error: batchStatusError,
   } = useQuery({
-    queryKey: ["batchStatus", batchId, page, size, store.skipProcessedFiles],
+    queryKey: ["batchStatus", batchId, page, size, store.skipProcessedFiles, sortConfig],
     enabled: !!batchId,
     queryFn: async () => {
       // Forward the skip decision so the endpoint returns only the files
       // the pipeline will actually process, giving the correct total count
       const skipParam = store.skipProcessedFiles ? "&skip_processed=true" : "";
-      const url = `/batches/${batchId}/files?page=${page}&size=${size}${skipParam}`;
+      
+      let sortParam = "";
+      if (sortConfig && sortConfig.length > 0) {
+        const sortBy = sortConfig.map(s => s.key).join(",");
+        const sortOrder = sortConfig.map(s => s.direction).join(",");
+        sortParam = `&sort_by=${sortBy}&sort_order=${sortOrder}`;
+      }
+      
+      const url = `/batches/${batchId}/files?page=${page}&size=${size}${skipParam}${sortParam}`;
       const data = await fetcher<{
         items: FilesListItem[];
         page: number;
@@ -132,27 +156,33 @@ const Index = () => {
       });
       setDirError(null);
       return { ok: true };
-    } catch (err: any) {
-      setDirError(err.message);
+    } catch (err) {
+      const error = err as Error;
+      setDirError(error.message);
       if (showToast) {
         toast.error("Directory not writable", {
-          description: err.message,
+          description: error.message,
         });
       }
-      return { ok: false, error: err.message };
+      return { ok: false, error: error.message };
     }
   };
 
   // After we get job status done from Batch processing stream
-  const pendingFiles = useMemo(() => {
-    if (!batchStatusData?.items?.length) return [];
+  useEffect(() => {
+    if (!batchStatusData?.items?.length) return;
+
     const data = batchStatusData.items.map((f) => ({
-      id: f.content_hash,
+      id: crypto.randomUUID(),
+      batchId: f.batch_id,
       name: f.name,
       hash: f.content_hash,
       size: f.size_bytes,
       relPath: f.rel_path,
-      isAlreadyRegistered: true,
+      isAlreadyProcessed: f.is_processed,
+      method: f.method,
+      flags: f.flags,
+      error_message: f.error_message,
     }));
     store.setPendingFiles(data);
   }, [batchStatusData]);
@@ -163,6 +193,9 @@ const Index = () => {
       f.name.toLowerCase().endsWith(".pdf"),
     );
     if (newFiles.length === 0) return;
+
+    setBatchId("");
+    store.setSkipProcessedFiles(false);
 
     const entries = newFiles.map((f) => {
       const absPath = (f as File & { path?: string }).path || "";
@@ -182,6 +215,8 @@ const Index = () => {
     store.setTotalFiles(entries.length);
     store.setCompletedFiles(0);
     store.setOverallProgress(0);
+    setPage(1);
+    setFilesPage(1);
     store.addLog(
       `Added ${entries.length} file(s). Calculating hashes...`,
       "info",
@@ -198,6 +233,10 @@ const Index = () => {
   };
 
   const handleRegisterPath = async (path: string) => {
+    setBatchId("");
+    store.setPendingFiles([]);
+    store.setSkipProcessedFiles(false);
+    queryClient.removeQueries({ queryKey: ["batchStatus"] });
     try {
       const res = await fetch(`${API_BASE}/batches`, {
         method: "POST",
@@ -218,11 +257,22 @@ const Index = () => {
 
       const data = await res.json();
       if (data.batch_id) {
+        setBatchId("");
+        store.setRegisteredPaths([{
+          batchId: data.batch_id,
+          path: data.resolved_path,
+          isFolder: data.is_folder,
+          status: data.scan_status,
+          pdfCount: data.pdf_count,
+          alreadyProcessedCount: data.already_processed_count,
+        }]);
         getBatchStatusStream();
         store.setTotalFiles(0);
         store.setCompletedFiles(0);
         store.setOverallProgress(0);
         store.setSkipProcessedFiles(false);
+        setPage(1);
+        setFilesPage(1);
       }
     } catch (e) {
       store.addLog(`Failed to register path: ${e}`, "error");
@@ -230,20 +280,57 @@ const Index = () => {
   };
 
   const getBatchStatusStream = () => {
+    if (batchEventSourceRef.current) {
+      batchEventSourceRef.current.close();
+    }
     const eventSource = new EventSource(BATCH_SSE_URL);
+    batchEventSourceRef.current = eventSource;
+
     eventSource.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      if (data.scan_status === "done") {
-        setBatchId(data.batch_id);
-        store.addLog(`Batch ready to process`, "info");
+      if (
+        data.scan_status === "scanning" ||
+        data.scan_status === "done" ||
+        data.scan_status === "error"
+      ) {
+        if (data.scan_status === "done") {
+          setBatchId(data.batch_id);
+          store.addLog(`Batch ready to process`, "info");
+        } else if (data.scan_status === "error") {
+          store.addLog(`Batch scan failed: ${data.error_message}`, "error");
+          toast.error("Batch scan failed", {
+            description: data.error_message || "An error occurred while scanning the directory.",
+          });
+        }
+        store.setRegisteredPaths((prev) =>
+          prev.map((item) =>
+            item.batchId === data.batch_id
+              ? {
+                  ...item,
+                  status: data.scan_status,
+                  pdfCount: data.pdf_count ?? item.pdfCount,
+                  alreadyProcessedCount: data.already_processed_count
+                      ?? item.alreadyProcessedCount,
+                  filesScanned: data.files_scanned ?? item.filesScanned
+                }
+              : item,
+          ),
+        );
       }
     };
     eventSource.onerror = () => {
-      store.addLog(`Event stream failed for batch processing.`, "success");
+      store.addLog(`Event stream failed for batch processing.`, "error");
+      store.setRegisteredPaths((prev) =>
+        prev.map((item) =>
+          item.status === "scanning"
+            ? { ...item, status: "error" }
+            : item
+        )
+      );
       eventSource.close();
-    };
-    return () => {
-      eventSource.close();
+      if (batchEventSourceRef.current === eventSource) {
+        batchEventSourceRef.current = null;
+      }
     };
   };
 
@@ -262,28 +349,36 @@ const Index = () => {
       }
     }
 
-    // 0. Duplicate Check
+    // Check for alreay processed files via file hash
     if (!force && !skipDuplicates) {
-      const hashes = store.pendingFiles
+
+      // For files selected to be uploaded (drag & drop), hash is generated on FE
+      // and this hash is checked against backend API response
+      const filesToUpload = store.pendingFiles.filter(
+        (pf) => !pf.isPathReference && pf.file,
+      );
+
+      const fileHashes = filesToUpload
         .map((p) => p.hash)
         .filter(Boolean) as string[];
-      if (hashes.length > 0) {
+
+      if (fileHashes.length > 0) {
         try {
           const checkRes = await fetch(`${API_BASE}/upload/check-hashes`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ hashes }),
+            body: JSON.stringify({ hashes: fileHashes }),
           });
           const checkData = await checkRes.json();
           // API returns already_processed as a dict, we want the keys
-          const alreadyHashes = Object.keys(checkData.already_processed || {});
+          const processedFileHashes = Object.keys(checkData.already_processed || {});
 
-          if (alreadyHashes.length > 0) {
-            store.setReprocessData({
-              hashes,
-              alreadyHashes,
-              totalItems: store.pendingFiles.length,
-              alreadyCount: alreadyHashes.length,
+          if (processedFileHashes.length > 0) {
+            store.setReprocessModalData({
+              fileHashes,
+              processedFileHashes,
+              totalFilesCount: filesToUpload.length,
+              processedFilesCount: processedFileHashes.length,
             });
             store.setShowReprocessModal(true);
             return; // STOP HERE: wait for user decision in modal
@@ -292,11 +387,33 @@ const Index = () => {
           console.error("Duplicate check failed:", e);
         }
       }
+
+      // For files selected via path register (import buttons)
+      // batch event stream already responds with processed files count
+      // no need to hash in FE, this is checked in BE and sent as event response
+      const totalProcessedFiles = store.registeredPaths.reduce(
+        (sum, item) => sum + item.alreadyProcessedCount,
+        0
+      );
+
+      const totalFiles = store.registeredPaths.reduce(
+        (sum, item) => sum + item.pdfCount,
+        0
+      );
+
+      if (totalProcessedFiles > 0) {
+        store.setReprocessModalData({
+          totalFilesCount: totalFiles,
+          processedFilesCount: totalProcessedFiles
+        });
+        store.setShowReprocessModal(true);
+        return; // wait for user decision in modal
+      }
     }
 
-    // 1. Separate files to upload vs references
+    // Separate files to upload (if present)
     const filesToUpload = store.pendingFiles.filter(
-      (pf) => !pf.isReference && pf.file,
+      (pf) => !pf.isPathReference && pf.file,
     );
     let uploadedIds: string[] = [];
 
@@ -330,17 +447,17 @@ const Index = () => {
       }
     }
 
-    // 2. Prepare selected_files payload for references
+    // Prepare selected_files payload for references
     const selectedFilesPayload: Record<string, string[]> = {};
-    if (store.registeredRefIds.length > 0) {
-      const refPending = store.pendingFiles.filter((pf) => pf.isReference);
+    if (store.registeredPaths.length > 0) {
+      const refPending = store.pendingFiles.filter((pf) => !pf.file);
       for (const pf of refPending) {
-        if (pf.refId) {
-          if (!selectedFilesPayload[pf.refId]) {
-            selectedFilesPayload[pf.refId] = [];
+        if (pf.batchId) {
+          if (!selectedFilesPayload[pf.batchId]) {
+            selectedFilesPayload[pf.batchId] = [];
           }
           if (pf.relPath) {
-            selectedFilesPayload[pf.refId].push(pf.relPath);
+            selectedFilesPayload[pf.batchId].push(pf.relPath);
           }
         }
       }
@@ -350,11 +467,11 @@ const Index = () => {
     // the file list to only the files actually queued for processing
     store.setSkipProcessedFiles(skipDuplicates);
 
-    // 3. Start Job
+    // Start Job
     startJob(
       {
         batch_id: batchId,
-        file_ids: [...uploadedIds, ...store.registeredRefIds],
+        file_ids: [...uploadedIds],
         selected_files:
           Object.keys(selectedFilesPayload).length > 0
             ? selectedFilesPayload
@@ -367,12 +484,13 @@ const Index = () => {
         onSuccess: () => {
           // Clear pending files to UI transition into dashboard
           store.setPendingFiles([]);
-          store.setRegisteredRefIds([]);
           store.setRegisteredPaths([]);
           setBatchId("");
+          setPage(1);
+          setFilesPage(1);
           store.addLog("Pipeline started successfully!", "success");
         },
-        onError: (error: any) => {
+        onError: (error: Error) => {
           store.addLog(`Failed to start job: ${error.message}`, "error");
           toast.error("Failed to start job", {
             description: error.message,
@@ -401,8 +519,8 @@ const Index = () => {
       <ReprocessModal
         open={store.showReprocessModal}
         onOpenChange={store.setShowReprocessModal}
-        alreadyCount={store.reprocessData?.alreadyCount || 0}
-        totalCount={store.reprocessData?.totalItems || 0}
+        processedCount={store.reprocessModalData?.processedFilesCount || 0}
+        totalCount={store.reprocessModalData?.totalFilesCount || 0}
         onSkip={() => {
           store.setShowReprocessModal(false);
           handleStartProcessing(false, true);
@@ -421,8 +539,8 @@ const Index = () => {
         <AppSidebar
           currentView={store.currentView}
           onViewChange={(v) => {
-              localStorage.setItem('view', v)
-              store.setCurrentView(v);
+            localStorage.setItem("view", v);
+            store.setCurrentView(v);
           }}
           stats={{
             total: store.totalFiles,
@@ -460,21 +578,33 @@ const Index = () => {
                   }}
                   onStart={() => handleStartProcessing()}
                   eventErr={false}
+                  onToggleSettings={() => setIsSettingsOpen(true)}
                 />
 
                 <FileTable
                   files={store.isProcessing ? jobFiles?.items || [] : []}
                   pendingFiles={store.pendingFiles}
                   pagination={
-                    batchStatusData?.pagination || {
-                      page: 1,
-                      size: 10,
-                      total: 0,
-                      pages: 1,
-                    }
+                    store.isProcessing
+                      ? jobFiles?.pagination || {
+                          page: 1,
+                          size: 10,
+                          total: 0,
+                          pages: 1,
+                        }
+                      : batchStatusData?.pagination || {
+                          page: 1,
+                          size: 10,
+                          total: 0,
+                          pages: 1,
+                        }
                   }
                   onPageChange={(p) => {
-                    setPage(p);
+                    if (store.isProcessing) {
+                      setFilesPage(p);
+                    } else {
+                      setPage(p);
+                    }
                   }}
                   selectedFiles={store.selectedFiles}
                   isLoading={isFilesLoading && store.isProcessing}
@@ -486,9 +616,7 @@ const Index = () => {
                         (item) => item.webkitGetAsEntry()?.isDirectory,
                       );
                       if (hasFolder) {
-                        toast.error(
-                          "Folders are not supported. Please upload PDF files only.",
-                        );
+                        toast.error("Folders are not supported. Please upload PDF files only.");
                         return;
                       }
                       const files = await getFilesFromDataTransfer(e.dataTransfer.items);
@@ -497,14 +625,30 @@ const Index = () => {
                       handleAddFiles(e.dataTransfer.files);
                     }
                   }}
+                  isScanning={
+                    store.registeredPaths.some((p) => p.status === "scanning") ||
+                    (!!batchId && isBatchStatusPending)
+                  }
+                  scannedCount={store.registeredPaths.reduce(
+                    (sum, p) => sum + (p.status === "scanning" ? p.filesScanned : p.pdfCount || 0),
+                    0,
+                  )}
+                  sortConfig={sortConfig}
+                  onSortChange={setSortConfig}
+                  isError={
+                    (store.isProcessing && !!jobFilesError) ||
+                    (!store.isProcessing && !!batchStatusError)
+                  }
+                  errorMessage={
+                    (store.isProcessing ? jobFilesError?.message : batchStatusError?.message) ||
+                    "An error occurred while loading files."
+                  }
                 />
 
                 <LogsPanel
                   logs={store.logs}
                   autoscroll={store.logsAutoscroll}
-                  onToggleAutoscroll={() =>
-                    store.setLogsAutoscroll(!store.logsAutoscroll)
-                  }
+                  onToggleAutoscroll={() => store.setLogsAutoscroll(!store.logsAutoscroll)}
                 />
               </>
             )}
@@ -536,6 +680,8 @@ const Index = () => {
                     return "Failed to load log.";
                   }
                 }}
+                isError={!!runsError}
+                errorMessage={runsError?.message || "Failed to load runs history."}
               />
             )}
 
@@ -558,9 +704,7 @@ const Index = () => {
             {store.currentView === "search" && (
               <SearchPanel
                 query={store.searchQuery}
-                results={
-                  store.searchQuery.trim() ? searchData?.items || [] : []
-                }
+                results={store.searchQuery.trim() ? searchData?.items || [] : []}
                 pagination={
                   store.searchQuery.trim()
                     ? searchData?.pagination || {
@@ -586,11 +730,13 @@ const Index = () => {
                   }
                 }}
                 getDownloadUrl={getDownloadUrl}
+                isError={!!searchError}
+                errorMessage={searchError?.message || "Search query failed."}
               />
             )}
 
             {store.currentView === "settings" && (
-              <div className="glass rounded-2xl p-6 space-y-6">
+              <div className="glass rounded-2xl p-4 sm:p-6 space-y-6">
                 <div>
                   <h2 className="font-semibold text-lg flex items-center gap-2">
                     <span className="p-1.5 rounded-lg bg-primary/10 text-primary">
@@ -603,14 +749,15 @@ const Index = () => {
                   </p>
                 </div>
 
-                <div className="space-y-4 max-w-2xl bg-secondary/20 p-4 rounded-xl border border-border/40">
+                <div className="space-y-4 w-full bg-secondary/20 p-3 sm:p-4 rounded-xl border border-border/40">
                   <div className="flex items-start gap-2.5 text-xs text-muted-foreground">
                     <Info className="h-4 w-4 shrink-0 text-primary mt-0.5" />
                     <div>
                       <p className="font-medium text-foreground">Storage Resolution</p>
                       <p className="mt-0.5 text-muted-foreground">
-                        If left blank, files will be saved to the default <code className="px-1.5 py-0.5 rounded bg-secondary-foreground/10 text-foreground font-mono">extracted_files</code> directory.
-                        Providing an absolute path will write files directly to that folder.
+                        If left blank, files will be saved to the default <code className="px-1.5 py-0.5 rounded bg-secondary-foreground/10 text-foreground font-mono">
+                          extracted_files </code> directory. Providing an absolute path will write files directly to that
+                        folder.
                       </p>
                     </div>
                   </div>
@@ -619,7 +766,7 @@ const Index = () => {
                     <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
                       Target Folder Path
                     </label>
-                    <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2">
                       <Input
                         type="text"
                         placeholder="e.g. /Users/username/extracted_files"
@@ -632,57 +779,60 @@ const Index = () => {
                           await handleValidateDir(e.target.value);
                         }}
                         className={cn(
-                          "font-mono text-sm bg-background/50",
-                          dirError && "border-destructive focus-visible:ring-destructive"
+                          "font-mono text-sm bg-background/50 flex-1",
+                          dirError && "border-destructive focus-visible:ring-destructive",
                         )}
                       />
-                      {isElectronAvailable() && (
-                        <Button
-                          variant="secondary"
-                          onClick={async () => {
-                            const selectedPath = await openFolder();
-                            if (selectedPath) {
-                              store.setExtractionOutputDir(selectedPath);
-                              const res = await handleValidateDir(selectedPath);
-                              if (res.ok) {
-                                toast.success("Output directory updated", {
-                                  description: selectedPath,
-                                });
+                      <div className="flex gap-2 shrink-0 justify-end sm:justify-start">
+                        {isElectronAvailable() && (
+                          <Button
+                            variant="secondary"
+                            onClick={async () => {
+                              const selectedPath = await openFolder();
+                              if (selectedPath) {
+                                store.setExtractionOutputDir(selectedPath);
+                                const res = await handleValidateDir(selectedPath);
+                                if (res.ok) {
+                                  toast.success("Output directory updated", {
+                                    description: selectedPath,
+                                  });
+                                }
                               }
-                            }
-                          }}
-                          className="gap-1.5 shrink-0"
-                        >
-                          <FolderOpen className="h-4 w-4" />
-                          Select
-                        </Button>
-                      )}
-                      {store.extractionOutputDir && (
-                        <Button
-                          variant="ghost"
-                          onClick={() => {
-                            store.setExtractionOutputDir("");
-                            setDirError(null);
-                            toast.success("Reset to default output directory");
-                          }}
-                          className="shrink-0 text-muted-foreground hover:text-destructive"
-                          title="Reset to default"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
+                            }}
+                            className="gap-1.5 flex-1 sm:flex-initial"
+                          >
+                            <FolderOpen className="h-4 w-4" />
+                            Select
+                          </Button>
+                        )}
+                        {store.extractionOutputDir && (
+                          <Button
+                            variant="ghost"
+                            onClick={() => {
+                              store.setExtractionOutputDir("");
+                              setDirError(null);
+                              toast.success("Reset to default output directory");
+                            }}
+                            className="text-muted-foreground hover:text-destructive flex-1 sm:flex-initial justify-center gap-1.5"
+                            title="Reset to default"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            <span className="sm:hidden text-xs">Reset</span>
+                          </Button>
+                        )}
+                      </div>
                     </div>
                     {dirError && (
-                      <p className="text-xs text-destructive font-medium mt-1">
-                        {dirError}
-                      </p>
+                      <p className="text-xs text-destructive font-medium mt-1">{dirError}</p>
                     )}
                   </div>
                 </div>
 
                 <div className="border-t border-border/50 pt-4">
                   <p className="text-xs text-muted-foreground">
-                    Other processing settings (like header/footer removal) are configured using the control panel on the right.
+                    Other processing settings (like header/footer removal) are configured using the{" "}
+                    <span className="hidden lg:inline">control panel on the right.</span>
+                    <span className="inline lg:hidden">"Configure" button on the dashboard.</span>
                   </p>
                 </div>
               </div>
@@ -695,7 +845,22 @@ const Index = () => {
           applyAll={applyAll}
           onUpdate={store.updateSetting}
           onAllUpdate={handleAllUpdate}
+          className="hidden lg:flex"
         />
+
+        <Sheet open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+          <SheetContent side="right" className="p-0 w-80 border-l border-border/50 glass-strong">
+            <div className="h-full flex flex-col pt-10">
+              <SettingsPanel
+                settings={store.settings}
+                applyAll={applyAll}
+                onUpdate={store.updateSetting}
+                onAllUpdate={handleAllUpdate}
+                isSidebar={false}
+              />
+            </div>
+          </SheetContent>
+        </Sheet>
       </div>
     </div>
   );

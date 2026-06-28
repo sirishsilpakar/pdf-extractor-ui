@@ -4,6 +4,9 @@ import type {
   LogEntry,
   NavView,
   PendingFile,
+  RegisteredPath,
+  ReprocessModalData,
+  Setter,
 } from "@/types";
 
 const defaultSettings: ProcessingSettings = {
@@ -49,19 +52,17 @@ interface LogState {
 
 interface PendingFilesState {
   pendingFiles: PendingFile[];
-  setPendingFiles: (files: PendingFile[] | ((prev: PendingFile[]) => PendingFile[])) => void;
+  setPendingFiles: Setter<PendingFile[]>;
   removePendingFile: (id: string) => void;
-  registeredRefIds: string[];
-  setRegisteredRefIds: (ids: string[] | ((prev: string[]) => string[])) => void;
-  registeredPaths: { id: string; path: string; pdfCount: number; alreadyProcessedCount: number }[];
-  setRegisteredPaths: (paths: { id: string; path: string; pdfCount: number; alreadyProcessedCount: number }[] | ((prev: { id: string; path: string; pdfCount: number; alreadyProcessedCount: number }[]) => { id: string; path: string; pdfCount: number; alreadyProcessedCount: number }[])) => void;
+  registeredPaths: RegisteredPath[];
+  setRegisteredPaths: Setter<RegisteredPath[]>;
 }
 
-interface ReprocessState {
+interface ReprocessModalState {
   showReprocessModal: boolean;
   setShowReprocessModal: (val: boolean) => void;
-  reprocessData: { hashes: string[]; alreadyHashes: string[]; totalItems: number; alreadyCount: number } | null;
-  setReprocessData: (data: { hashes: string[]; alreadyHashes: string[]; totalItems: number; alreadyCount: number } | null) => void;
+  reprocessModalData: ReprocessModalData | null;
+  setReprocessModalData: (data: ReprocessModalData | null) => void;
 }
 
 interface SSEState {
@@ -89,7 +90,7 @@ interface SSEState {
   setEtaSeconds: (val: number | null) => void;
 }
 
-type AppState = UIState & SelectionState & SettingsState & LogState & PendingFilesState & ReprocessState & SSEState;
+type AppState = UIState & SelectionState & SettingsState & LogState & PendingFilesState & ReprocessModalState & SSEState;
 
 export const useAppStore = create<AppState>((set, get) => ({
   // UI State
@@ -146,18 +147,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   })),
   removePendingFile: (id) => set((state) => ({
     pendingFiles: state.pendingFiles.filter((f) => f.id !== id),
-    registeredPaths: state.registeredPaths.filter((p) => {
-      if (p.id === id) {
-        // Also remove from ref ids
-        set({ registeredRefIds: state.registeredRefIds.filter(rid => rid !== p.id) });
-        return false;
-      }
-      return true;
-    })
-  })),
-  registeredRefIds: [],
-  setRegisteredRefIds: (idsOrFn) => set((state) => ({
-    registeredRefIds: typeof idsOrFn === "function" ? idsOrFn(state.registeredRefIds) : idsOrFn
+    // Todo: Implement to remove from registeredPath (backend)
   })),
   registeredPaths: [],
   setRegisteredPaths: (pathsOrFn) => set((state) => ({
@@ -167,8 +157,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Reprocess State
   showReprocessModal: false,
   setShowReprocessModal: (val) => set({ showReprocessModal: val }),
-  reprocessData: null,
-  setReprocessData: (data) => set({ reprocessData: data }),
+  reprocessModalData: null,
+  setReprocessModalData: (data) => set({ reprocessModalData: data }),
 
   // SSE State
   isProcessing: false,

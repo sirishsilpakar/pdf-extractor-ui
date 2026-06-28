@@ -112,11 +112,12 @@ export function formatChars(
  * B, KB, or MB units with one decimal place for KB and MB values.
  *
  * @param bytes - The file size in bytes.
+ * @param locale The locale used for formatting. Defaults to `"de-DE"`.
  *
  * @returns A formatted file size string (e.g., "512 B", "1.5 KB", "3.2 MB").
  */
-export function formatFileSize(bytes: number) {
-  if (bytes < 1024) return bytes + " B";
-  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + " KB";
-  return (bytes / 1048576).toFixed(1) + " MB";
+export function formatFileSize(bytes: number, locale: string = "de-DE") {
+  if (bytes < 1024) return formatNumCompact(bytes, locale) + " B";
+  if (bytes < 1048576) return formatNumCompact(bytes / 1024, locale) + " KB";
+  return formatNumCompact(bytes / 1048576, locale) + " MB";
 }

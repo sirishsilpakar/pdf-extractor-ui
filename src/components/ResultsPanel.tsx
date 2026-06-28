@@ -11,10 +11,13 @@ import {
   RefreshCw,
   X,
   Loader2,
+  TriangleAlert,
+  AlertCircle,
 } from "lucide-react";
 import type { ExtractionResult, ExtractionResultDetail } from "@/types";
 import { cn } from "@/lib/utils";
 import { FileViewerModal } from "./FileViewerModal";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { useAllRunIds } from "@/hooks/queries/useRuns";
 import { useResultTree, useResultDirectoryFiles } from "@/hooks/queries/useResults";
 
@@ -51,35 +54,46 @@ const FileRow = ({
 
   return (
     <div className="flex items-center gap-3 pl-4 pr-6 py-2 hover:bg-secondary/20 transition-colors group h-[52px]">
-      <span
-        className="flex-1 text-sm font-medium truncate flex items-center gap-2"
-        title={r.rel_path}
-      >
-        <span>{fname}</span>
-        {showRunInfo && r.run_id && (
-          <span className="text-[10px] text-muted-foreground/50 font-normal shrink-0">
-            {r.run_id === "no-run" ? "Direct" : `Run #${r.run_number ?? r.run_id.slice(0, 8)}`}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="flex-1 text-sm font-medium truncate flex items-center gap-2 cursor-help">
+            <span className="truncate">{fname}</span>
+            {showRunInfo && r.run_id && (
+              <span className="text-[10px] text-muted-foreground/50 font-normal shrink-0">
+                {r.run_id === "no-run" ? "Direct" : `Run #${r.run_number ?? r.run_id.slice(0, 8)}`}
+              </span>
+            )}
           </span>
-        )}
-      </span>
+        </TooltipTrigger>
+        <TooltipContent side="top" align="start" className="text-xs max-w-[400px] break-all">
+          {r.rel_path}
+          {r.error_message && (
+            <div className="mt-1 text-destructive/85 font-mono text-[10px] border-t border-border/20 pt-1">
+              Error: {r.error_message}
+            </div>
+          )}
+        </TooltipContent>
+      </Tooltip>
       <Badge
         variant="outline"
-        className="rounded-md text-[9px] uppercase font-bold tracking-wider shrink-0 h-5"
+        className={cn(
+          "rounded-md text-[9px] uppercase font-bold tracking-wider shrink-0 h-5 w-14 flex items-center justify-center text-center",
+          r.method === "error" && "border-destructive/30 bg-destructive/10 text-destructive"
+        )}
       >
         {r.method || "?"}
       </Badge>
-      {confPct && (
-        <span
-          className={cn(
-            "text-[11px] font-semibold shrink-0 w-12 text-right",
-            highConf ? "text-success" : "text-destructive",
-          )}
-        >
-          {confPct}
-        </span>
-      )}
+      <span
+        className={cn(
+          "text-[11px] shrink-0 w-12 text-right",
+          r.method === "error" ? "text-muted-foreground font-normal" : "font-semibold",
+          r.method !== "error" && (highConf ? "text-success" : "text-destructive")
+        )}
+      >
+        {r.method === "error" ? "-" : (confPct || "-")}
+      </span>
       <span className="text-[11px] text-muted-foreground shrink-0 w-16 text-right">
-        {format.chars(r.char_count)}
+        {r.method === "error" ? "-" : format.chars(r.char_count)}
       </span>
       {dt && (
         <span className="text-[11px] text-muted-foreground shrink-0 hidden lg:block opacity-60 w-16 text-right">
@@ -87,23 +101,48 @@ const FileRow = ({
         </span>
       )}
       <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity w-16 justify-end">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 rounded-lg hover:bg-primary hover:text-white"
-          onClick={() => onView(r)}
-          title="View text"
-        >
-          <Eye className="h-3.5 w-3.5" />
-        </Button>
-        <a
-          href={getDownloadUrl(r.id)}
-          download={`${fname}.txt`}
-          title="Download .txt"
-          className="inline-flex items-center justify-center h-7 w-7 rounded-lg transition-colors hover:bg-primary hover:text-white"
-        >
-          <Download className="h-3.5 w-3.5" />
-        </a>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 rounded-lg hover:bg-primary hover:text-white"
+              onClick={() => onView(r)}
+            >
+              <Eye className="h-3.5 w-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top" align="center" className="text-xs">
+            View text
+          </TooltipContent>
+        </Tooltip>
+        {r.method !== "error" ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <a
+                href={getDownloadUrl(r.id)}
+                download={`${fname}.txt`}
+                className="inline-flex items-center justify-center h-7 w-7 rounded-lg transition-colors hover:bg-primary hover:text-white"
+              >
+                <Download className="h-3.5 w-3.5" />
+              </a>
+            </TooltipTrigger>
+            <TooltipContent side="top" align="center" className="text-xs">
+              Download .txt
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center justify-center h-7 w-7 text-destructive cursor-help">
+                <AlertCircle className="h-4 w-4" />
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="top" align="end" className="text-xs max-w-[250px] font-normal">
+              {r.error_message || r.flags?.replace(/_/g, " ") || "File extraction failed"}
+            </TooltipContent>
+          </Tooltip>
+        )}
       </div>
     </div>
   );
@@ -260,7 +299,7 @@ export function ResultsPanel({ runFilter, onRunFilterChange, onGetDetail, getDow
     setTreePage(1);
   }, [runFilter]);
 
-  const { data: tree, isLoading } = useResultTree(runFilter, treePage, 20);
+  const { data: tree, isLoading, isError, error } = useResultTree(runFilter, treePage, 20);
 
   const directories = tree?.directories ?? [];
   const files = tree?.topLevelFiles ?? [];
@@ -388,6 +427,28 @@ export function ResultsPanel({ runFilter, onRunFilterChange, onGetDetail, getDow
               </div>
             </div>
           ))
+        ) : isError ? (
+          <div className="glass rounded-2xl p-8 flex flex-col items-center justify-center space-y-4 min-h-[300px] border-destructive/20 text-center" role="alert">
+            <div className="w-12 h-12 rounded-full bg-destructive/10 text-destructive flex items-center justify-center mx-auto">
+              <TriangleAlert className="h-6 w-6" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="font-semibold text-base text-destructive">Failed to Load Extracted Files</h3>
+              <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+                {error instanceof Error ? error.message : "An unexpected error occurred while loading results."}
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                queryClient.invalidateQueries({ queryKey: ["results"] });
+              }}
+              className="gap-2 rounded-xl h-8 hover:bg-primary hover:text-white"
+            >
+              <RefreshCw className="h-4 w-4" /> Retry
+            </Button>
+          </div>
         ) : (
           <div className="glass rounded-2xl overflow-hidden border border-border/50 flex flex-col divide-y divide-border/30">
             {directories.map((dir) => (
@@ -428,7 +489,7 @@ export function ResultsPanel({ runFilter, onRunFilterChange, onGetDetail, getDow
             {pages > 1 && (
               <div className="flex items-center justify-between p-4">
                 <p className="text-xs text-muted-foreground">
-                  Showing page {page} of {pages}
+                  Showing page {page} of {pages} ({total} files)
                 </p>
                 <div className="flex items-center gap-2">
                   <Button

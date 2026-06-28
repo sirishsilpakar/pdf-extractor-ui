@@ -5,16 +5,22 @@ import { fileURLToPath } from "url";
 import { ipcMain, dialog, shell } from "electron";
 
 ipcMain.handle("open-file-dialog", async () => {
-  const result = await dialog.showOpenDialog({
+  const focusedWindow = BrowserWindow.getFocusedWindow();
+
+  const result = await dialog.showOpenDialog(focusedWindow, {
     properties: ["openFile"],
     filters: [{ name: "PDF Files", extensions: ["pdf"] }],
+    modal: true
   });
   return result.filePaths[0];
 });
 
 ipcMain.handle("open-folder-dialog", async () => {
-  const result = await dialog.showOpenDialog({
+  const focusedWindow = BrowserWindow.getFocusedWindow();
+
+  const result = await dialog.showOpenDialog(focusedWindow, {
     properties: ["openDirectory"],
+    modal: true
   });
   return result.filePaths[0];
 });

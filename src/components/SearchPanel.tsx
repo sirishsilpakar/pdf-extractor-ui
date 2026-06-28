@@ -15,6 +15,8 @@ interface Props {
   onGetDetail: (id: number) => Promise<ExtractionResultDetail | null>;
   getDownloadUrl: (id: number) => string;
   isLoading?: boolean;
+  isError?: boolean;
+  errorMessage?: string;
 }
 
 export function SearchPanel({
@@ -26,6 +28,8 @@ export function SearchPanel({
   onGetDetail,
   getDownloadUrl,
   isLoading,
+  isError = false,
+  errorMessage = "An error occurred while searching.",
 }: Props) {
   const [inputValue, setInputValue] = useState(query);
   const [viewingResult, setViewingResult] = useState<SearchResult | null>(null);
@@ -133,6 +137,26 @@ export function SearchPanel({
               <div className="h-16 w-full bg-muted/10 animate-pulse rounded-lg" />
             </div>
           ))
+        ) : isError ? (
+          <div className="glass rounded-2xl p-8 flex flex-col items-center justify-center space-y-4 min-h-[300px] border-destructive/20 text-center" role="alert">
+            <div className="w-12 h-12 rounded-full bg-destructive/10 text-destructive flex items-center justify-center mx-auto">
+              <AlertTriangle className="h-6 w-6" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="font-semibold text-base text-destructive">Search Request Failed</h3>
+              <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+                {errorMessage}
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleSearch()}
+              className="gap-2 rounded-xl h-8 hover:bg-primary hover:text-white"
+            >
+              <RefreshCw className="h-4 w-4" /> Retry Search
+            </Button>
+          </div>
         ) : (
           <AnimatePresence>
             {results.map((r, idx) => (
@@ -182,7 +206,8 @@ export function SearchPanel({
       {pagination.total > 0 && (
         <div className="flex items-center justify-between px-2">
           <p className="text-xs text-muted-foreground">
-            Showing page {pagination.page} of {pagination.pages} ({pagination.total} result{pagination.total !== 1 ? 's' : ''})
+            Showing page {pagination.page} of {pagination.pages} ({pagination.total} result
+            {pagination.total !== 1 ? "s" : ""})
           </p>
           <div className="flex items-center gap-2">
             <Button

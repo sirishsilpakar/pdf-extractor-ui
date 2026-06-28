@@ -1,12 +1,12 @@
 import React from "react";
-import { Trash2, RotateCcw, FileText, FolderOpen } from "lucide-react";
+import { Trash2, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { TableCell } from "@/components/ui/table";
-import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import type { PDFFile, PendingFile } from "@/types";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { format } from "@/utils/format";
 
 
@@ -38,11 +38,8 @@ export const FileTableRow = React.memo(
         const size = pf.file ? pf.file.size : (pf.size || 0);
 
         return (
-          <motion.tr
+          <tr
             ref={ref}
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95 }}
             className="border-border/30 bg-secondary/10"
             role="row"
           >
@@ -59,19 +56,21 @@ export const FileTableRow = React.memo(
             </TableCell>
             <TableCell role="cell">
               <div className="flex items-center gap-2">
-                {pf.isReference ? (
-                  <FolderOpen className="h-4 w-4 text-primary shrink-0" aria-hidden="true" />
-                ) : (
                   <FileText className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden="true" />
-                )}
-                <span className="font-medium text-sm truncate max-w-[300px]">{name}</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="font-medium text-sm truncate max-w-[300px] cursor-help">{name}</span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" align="start" className="text-xs max-w-[400px] break-all">
+                    {name}
+                  </TooltipContent>
+                </Tooltip>
               </div>
             </TableCell>
-            <TableCell className="text-xs text-muted-foreground italic" role="cell">
-              {pf.isReference ? "Reference" : "Pending"}
+            <TableCell className="text-xs text-muted-foreground italic" role="cell">Pending
             </TableCell>
             <TableCell className="text-sm text-muted-foreground" role="cell">
-              {pf.size ? format.fileSize(pf.size) : "-" }
+              {size ? format.fileSize(size) : "-" }
             </TableCell>
             <TableCell role="cell">
               <div className="flex items-center gap-2">
@@ -89,7 +88,7 @@ export const FileTableRow = React.memo(
                 <Trash2 className="h-3.5 w-3.5" />
               </Button>
             </TableCell>
-          </motion.tr>
+          </tr>
         );
       }
 
@@ -97,11 +96,8 @@ export const FileTableRow = React.memo(
       const statusInfo = statusConfig[file.status] || { label: file.status, className: "bg-secondary" };
 
       return (
-        <motion.tr
+        <tr
           ref={ref}
-          initial={{ opacity: 0, y: -4 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, x: -20 }}
           className={cn(
             "border-border/30 transition-colors",
             file.status === "processing" && "bg-primary/5",
@@ -110,21 +106,43 @@ export const FileTableRow = React.memo(
           role="row"
         >
           <TableCell role="cell">
-            <Badge variant="outline" className={cn("rounded-lg text-[10px] font-medium", statusInfo.className)}>
-              {statusInfo.label}
-            </Badge>
+            {file.message || file.error_message || file.flags ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="inline-block cursor-help">
+                    <Badge variant="outline" className={cn("rounded-lg text-[10px] font-medium", statusInfo.className)}>
+                      {statusInfo.label}
+                    </Badge>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="top" align="start" className="text-xs max-w-[300px]">
+                  {file.message || file.error_message || file.flags?.replace(/_/g, " ")}
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              <Badge variant="outline" className={cn("rounded-lg text-[10px] font-medium", statusInfo.className)}>
+                {statusInfo.label}
+              </Badge>
+            )}
           </TableCell>
           <TableCell role="cell">
             <div className="flex items-center gap-2">
               <FileText className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden="true" />
-              <span className="font-medium text-sm truncate max-w-[300px]">{file.name}</span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="font-medium text-sm truncate max-w-[300px] cursor-help">{file.name}</span>
+              </TooltipTrigger>
+              <TooltipContent side="top" align="start" className="text-xs max-w-[400px] break-all">
+                {file.name}
+              </TooltipContent>
+            </Tooltip>
             </div>
           </TableCell>
           <TableCell role="cell">
             <span className="text-xs font-medium uppercase text-muted-foreground">{file.method}</span>
           </TableCell>
           <TableCell className="text-sm text-muted-foreground" role="cell">
-            {format.fileSize(file.size)}
+            {file.size && file.method !== "error" ? format.fileSize(file.size) : ""}
           </TableCell>
           <TableCell role="cell">
             <div className="flex items-center gap-2">
@@ -134,17 +152,6 @@ export const FileTableRow = React.memo(
           </TableCell>
           <TableCell role="cell">
             <div className="flex items-center gap-1">
-              {file.status === "failed" && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 rounded-lg"
-                  onClick={() => onRetry(file.id)}
-                  aria-label="Retry processing file"
-                >
-                  <RotateCcw className="h-3.5 w-3.5" />
-                </Button>
-              )}
               <Button
                 variant="ghost"
                 size="icon"
@@ -156,7 +163,7 @@ export const FileTableRow = React.memo(
               </Button>
             </div>
           </TableCell>
-        </motion.tr>
+        </tr>
       );
     }
   )

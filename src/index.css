@@ -93,6 +93,31 @@
     overflow-y: scroll; 
 }
 
+.custom-scrollbar {
+    &::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+    &::-webkit-scrollbar-track {
+        background: hsl(var(--muted) / 0.1);
+        border-radius: 5px;
+    }
+    &::-webkit-scrollbar-thumb {
+        background: hsl(var(--muted-foreground) / 0.45);
+        border: 2px solid transparent;
+        background-clip: padding-box;
+        border-radius: 5px;
+    }
+    &::-webkit-scrollbar-thumb:hover {
+        background: hsl(var(--primary) / 0.75);
+        border: 2px solid transparent;
+        background-clip: padding-box;
+    }
+    -ms-overflow-style: auto;
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.45) hsl(var(--muted) / 0.1);
+}
+
 @layer base {
   * {
     @apply border-border;

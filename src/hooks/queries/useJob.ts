@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetcher } from "@/lib/api";
-import type { PDFFile, PaginationState, ProcessingSettings } from "@/types";
+import type { PDFFile, PaginationState, ProcessingSettings, SortItem } from "@/types";
 
 export function useJobStatus() {
   return useQuery({
@@ -14,18 +14,27 @@ export function useJobFiles(
   size: number,
   enabled: boolean,
   skipProcessedFiles: boolean,
+  sortConfig?: SortItem[],
 ) {
   return useQuery({
-    queryKey: ["job-files", page, size],
+    queryKey: ["job-files", page, size, sortConfig],
     queryFn: async () => {
-      const skipParam = skipProcessedFiles ? "&skip_processed=true" : ""
+      const skipParam = skipProcessedFiles ? "&skip_processed=true" : "";
+      
+      let sortParam = "";
+      if (sortConfig && sortConfig.length > 0) {
+        const sortBy = sortConfig.map(s => s.key).join(",");
+        const sortOrder = sortConfig.map(s => s.direction).join(",");
+        sortParam = `&sort_by=${sortBy}&sort_order=${sortOrder}`;
+      }
+      
       const data = await fetcher<{
         items: Record<string, unknown>[]
         page: number
         size: number
         total: number
         pages: number
-      }>(`/job/files?page=${page}&size=${size}${skipParam}`)
+      }>(`/job/files?page=${page}&size=${size}${skipParam}${sortParam}`)
       const items: PDFFile[] = data.items.map((f: Record<string, unknown>) => ({
         id: f.id || f.name,
         name: f.name,
@@ -38,6 +47,9 @@ export function useJobFiles(
         currentPage: f.current_page,
         relPath: f.rel_path,
         runId: f.run_id,
+        message: f.message,
+        flags: f.flags,
+        error_message: f.error_message,
       }));
       return {
         items,
@@ -58,7 +70,8 @@ export function useCancelJob() {
   return useMutation({
     mutationFn: () => fetcher("/job/cancel", { method: "POST" }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["job-status"] });
+      queryClient.invalidateQueries({ queryKey: ["runs"] });
+      queryClient.invalidateQueries({ queryKey: ["job-files"] });
     },
   });
 }
@@ -68,7 +81,7 @@ export function useStartJob() {
   return useMutation({
     mutationFn: (payload: {
       batch_id: string
-      file_ids: string[]
+      file_ids?: string[]
       selected_files: Record<string, string[]> | null
       force: boolean
       output_dir?: string
@@ -80,8 +93,8 @@ export function useStartJob() {
         body: JSON.stringify(payload),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["job-status"] });
       queryClient.invalidateQueries({ queryKey: ["runs"] });
+      queryClient.invalidateQueries({ queryKey: ["job-files"] });
     },
   });
 }

@@ -14,6 +14,7 @@ function resetDashboard(state) {
   state.setProcessingFile("");
   state.setElapsedSeconds(0);
   state.setEtaSeconds(null);
+  state.setSkipProcessedFiles(false);
 }
 
 export function useSSE() {
@@ -59,11 +60,13 @@ export function useSSE() {
     }
 
     if (running) {
-      queryClient.invalidateQueries({ queryKey: ["job-files"] });
+      // Avoid query invalidations during active processing to prevent network storm requests
+      // Progress is pushed and updated via file_progress events
     } else {
       // Job just finished or is idle
       queryClient.invalidateQueries({ queryKey: ["runs"] });
       queryClient.invalidateQueries({ queryKey: ["results"] });
+      queryClient.invalidateQueries({ queryKey: ["job-files"] });
 
       if (data.status === "done" && data.total !== 0) {
         toast.success("Extraction is completed", { 
@@ -74,8 +77,11 @@ export function useSSE() {
               state.setResultsRunFilter(data.run_id);
             } 
           }, 
-          duration: 5000
+          duration: Infinity
         }); 
+        resetDashboard(state);
+      } else if (data.status === "failed") {
+        toast.error("Extraction failed");
         resetDashboard(state);
       }
     }
@@ -115,8 +121,8 @@ export function useSSE() {
                   return { 
                     ...item, 
                     progress: progressData.pct,
-                    method: progressData.method,
-                    status: "processing",
+                    method: progressData.method || item.method,
+                    status: progressData.status || (progressData.pct === 100 ? "completed" : "processing"),
                     currentPage: progressData.page,
                     totalPages: progressData.total_pages
                   } as PDFFile;
@@ -139,7 +145,6 @@ export function useSSE() {
           }
 
           if (progressData.pct === 100) {
-            queryClient.invalidateQueries({ queryKey: ["job-files"] });
             queryClient.invalidateQueries({ queryKey: ["results"] });
           }
           break;

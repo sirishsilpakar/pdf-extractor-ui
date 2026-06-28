@@ -15,7 +15,8 @@ import {
   TriangleAlert,
   Ban,
   FileCog,
-  FolderOpen
+  FolderOpen,
+  RefreshCw
 } from "lucide-react";
 import type { Run, PaginationState } from "@/types";
 import { isElectronAvailable, openPath } from "../lib/electron";
@@ -23,6 +24,7 @@ import { ensureChildDir } from "@/lib/fs";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { format } from "@/utils/format";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface Props {
   runs: Run[];
@@ -31,6 +33,8 @@ interface Props {
   onLoadRunLog: (runId: string) => Promise<string | null>;
   onPageChange: (page: number) => void;
   isLoading?: boolean;
+  isError?: boolean;
+  errorMessage?: string;
 }
 
 function fmtDuration(secs: number) {
@@ -53,6 +57,8 @@ export function RunsPanel({
   onLoadRunLog,
   onPageChange,
   isLoading,
+  isError = false,
+  errorMessage = "An error occurred while loading runs history.",
 }: Props) {
   const [viewingLog, setViewingLog] = useState<{
     id: string;
@@ -60,6 +66,42 @@ export function RunsPanel({
     content: string;
   } | null>(null);
   const [loadingLog, setLoadingLog] = useState(false);
+
+  const queryClient = useQueryClient();
+
+  if (isError) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 px-1">
+          <History className="h-5 w-5 text-primary" />
+          <h2 className="text-lg font-semibold tracking-tight">
+            Extraction History
+          </h2>
+        </div>
+        <div className="glass rounded-2xl p-8 flex flex-col items-center justify-center space-y-4 min-h-[300px] border-destructive/20 text-center" role="alert">
+          <div className="w-12 h-12 rounded-full bg-destructive/10 text-destructive flex items-center justify-center mx-auto">
+            <TriangleAlert className="h-6 w-6" />
+          </div>
+          <div className="space-y-2">
+            <h3 className="font-semibold text-base text-destructive">Failed to Load Runs</h3>
+            <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+              {errorMessage}
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              queryClient.invalidateQueries({ queryKey: ["runs"] });
+            }}
+            className="gap-2 rounded-xl h-8 hover:bg-primary hover:text-white"
+          >
+            <RefreshCw className="h-4 w-4" /> Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   const handleLoadLog = async (runId: string, runNumber?: number) => {
     setLoadingLog(true);
@@ -135,19 +177,33 @@ export function RunsPanel({
                 </Button>
               </div>
             </div>
-            <div className="flex-1 overflow-auto p-6 bg-black/40 font-mono text-[11px] leading-relaxed no-scrollbar whitespace-pre-wrap selection:bg-primary/30">
+            <div className="flex-1 overflow-auto p-6 bg-black/40 font-mono text-[11px] leading-relaxed custom-scrollbar whitespace-pre-wrap selection:bg-primary/30">
               {viewingLog.content}
             </div>
           </div>
         </div>
       )}
 
-      <div className="flex items-center gap-2 px-1">
-        <History className="h-5 w-5 text-primary" />
-        <h2 className="text-lg font-semibold tracking-tight leading-none">Extraction History</h2>
-        <span className="text-xs text-muted-foreground font-medium bg-secondary px-2 py-0.5 rounded-full leading-none">
-          {pagination.total} runs
-        </span>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-1 shrink-0">
+        <div className="flex items-center gap-2">
+          <History className="h-5 w-5 text-primary" />
+          <h2 className="text-lg font-semibold tracking-tight leading-none">Extraction History</h2>
+          <span className="text-xs text-muted-foreground font-medium bg-secondary px-2 py-0.5 rounded-full leading-none">
+            {pagination.total} runs
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              queryClient.invalidateQueries({ queryKey: ["runs"] });
+            }}
+            className="gap-2 rounded-xl h-8 hover:bg-primary hover:text-white"
+          >
+            <RefreshCw className="h-4 w-4" /> Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Run cards */}
@@ -189,27 +245,27 @@ export function RunsPanel({
                 running: {
                   label: "Processing...",
                   color: "bg-primary/10 text-primary border-primary/30",
-                  icon: <FileCog width={12} height={12} className="mr-2" />
+                  icon: <FileCog width={12} height={12} className="mr-2" />,
                 },
                 completed: {
                   label: "Completed",
                   color: "bg-success/10 text-success border-success/30",
-                  icon: <CircleCheckBig width={12} height={12} className="mr-2" />
+                  icon: <CircleCheckBig width={12} height={12} className="mr-2" />,
                 },
                 failed: {
                   label: "Failed",
                   color: "bg-destructive/10 text-destructive border-destructive/30",
-                  icon: <Ban width={12} height={12} className="mr-2" />
+                  icon: <Ban width={12} height={12} className="mr-2" />,
                 },
                 cancelled: {
                   label: "Cancelled",
                   color: "bg-yellow-500/10 text-yellow-500 border-yellow-500/30",
-                  icon: <TriangleAlert width={12} height={12} className="mr-2" />
+                  icon: <TriangleAlert width={12} height={12} className="mr-2" />,
                 },
                 done: {
                   label: "Done",
                   color: "bg-green-500/10 text-green-700 border-success/30",
-                  icon: <CircleCheckBig width={12} height={12} className="mr-2" />
+                  icon: <CircleCheckBig width={12} height={12} className="mr-2" />,
                 },
               }[run.status] ?? {
                 label: run.status.toUpperCase(),
@@ -382,7 +438,8 @@ export function RunsPanel({
       {pagination.total > 0 && (
         <div className="flex items-center justify-between px-2 py-4">
           <p className="text-xs text-muted-foreground">
-            Showing page {pagination.page} of {pagination.pages}
+            Showing page {pagination.page} of {pagination.pages} ({pagination.total} run
+            {pagination.total > 1 ? "s" : ""})
           </p>
           <div className="flex items-center gap-2">
             <Button

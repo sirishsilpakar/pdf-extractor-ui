@@ -1,9 +1,7 @@
 import { Switch } from "@/components/ui/switch";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Settings, Sliders } from "lucide-react";
 import type { ProcessingSettings } from "@/types";
-import { useState } from "react";
+import { cn } from "@/lib/utils";
 
 const toggleOptions: {
   key: keyof ProcessingSettings;
@@ -44,7 +42,9 @@ interface Props {
     key: K,
     value: ProcessingSettings[K],
   ) => void;
-  onAllUpdate;
+  onAllUpdate: (val: boolean) => void;
+  className?: string;
+  isSidebar?: boolean;
 }
 
 export function SettingsPanel({
@@ -52,9 +52,19 @@ export function SettingsPanel({
   settings,
   onUpdate,
   onAllUpdate,
+  className,
+  isSidebar = true,
 }: Props) {
+  const Component = isSidebar ? "aside" : "div";
   return (
-    <aside className="w-72 border-l border-border/50 glass flex flex-col shrink-0 overflow-y-auto">
+    <Component
+      className={cn(
+        isSidebar
+          ? "w-72 border-l border-border/50 glass flex flex-col shrink-0 overflow-y-auto"
+          : "flex flex-col h-full overflow-y-auto",
+        className,
+      )}
+    >
       <div className="p-4 border-b border-border/50 flex items-center gap-2">
         <Sliders className="h-4 w-4 text-primary" />
         <h2 className="font-semibold text-sm">Processing Settings</h2>
@@ -112,6 +122,6 @@ export function SettingsPanel({
           />
         </div>
       </div>
-    </aside>
+    </Component>
   );
 }
