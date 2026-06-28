@@ -1,0 +1,296 @@
+import fs from "fs";
+import path from "path";
+import https from "https";
+import { execSync } from "child_process";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Stable pre-compiled portable binaries
+// Linux: Statically compiled raw binary (requires no extraction)
+const TESSERACT_LINUX_URL =
+  process.env.TESSERACT_LINUX_URL ||
+  "https://github.com/DanielMYT/tesseract-static/releases/download/tesseract-5.5.2/tesseract.x86_64";
+
+// Windows: Official UB Mannheim installer (NSIS Framework)
+const TESSERACT_WIN_URL =
+  process.env.TESSERACT_WIN_URL ||
+  "https://github.com/UB-Mannheim/tesseract/releases/download/v5.4.0.20240606/tesseract-ocr-w64-setup-5.4.0.20240606.exe";
+
+// Parse command line arguments
+const args = process.argv.slice(2);
+let targetPlatform = process.platform; // default to host platform
+
+args.forEach((arg) => {
+  if (arg.startsWith("--platform=")) {
+    targetPlatform = arg.split("=")[1];
+  }
+});
+
+// Map node platform to bin folder name
+const platformMap = {
+  darwin: "mac",
+  win32: "win",
+  linux: "linux",
+};
+
+const osDirName = platformMap[targetPlatform];
+if (!osDirName) {
+  console.error(`Unsupported platform: ${targetPlatform}`);
+  process.exit(1);
+}
+
+const DEST_DIR = path.resolve(__dirname, "..", "bin", osDirName, "tesseract");
+
+function downloadFile(url, dest) {
+  return new Promise((resolve, reject) => {
+    console.log(`Downloading from ${url}...`);
+    const file = fs.createWriteStream(dest);
+    https
+      .get(url, (response) => {
+        if (response.statusCode === 302 || response.statusCode === 301) {
+          file.close();
+          downloadFile(response.headers.location, dest).then(resolve).catch(reject);
+          return;
+        }
+
+        if (response.statusCode !== 200) {
+          file.close();
+          fs.unlink(dest, () => {});
+          reject(new Error(`Failed to download: HTTP ${response.statusCode}`));
+          return;
+        }
+
+        response.pipe(file);
+        file.on("finish", () => {
+          file.close(resolve);
+        });
+        file.on("error", (err) => {
+          fs.unlink(dest, () => {});
+          reject(err);
+        });
+      })
+      .on("error", (err) => {
+        file.close();
+        fs.unlink(dest, () => {});
+        reject(err);
+      });
+  });
+}
+
+function extractArchive(filePath, destDir) {
+  if (!fs.existsSync(destDir)) {
+    fs.mkdirSync(destDir, { recursive: true });
+  }
+
+  // Case 1: Windows Setup Installer Executable (NSIS)
+  if (filePath.endsWith(".exe")) {
+    console.log(`Running silent background installer for Windows...`);
+    // NSIS silent flag is /S. 
+    // /D must be the last parameter and CANNOT be enclosed in quotes.
+    const installCmd = `"${filePath}" /S /D=${destDir}`;
+    console.log(`Executing: ${installCmd}`);
+    execSync(installCmd, { stdio: 'inherit' });
+    
+    // FALLBACK: If UB Mannheim ignored the /D flag, hunt down the global install and copy it.
+    const expectedExe = path.join(destDir, "tesseract.exe");
+    if (!fs.existsSync(expectedExe)) {
+      console.log(`Executable not found at ${destDir}. Hunting in global Program Files...`);
+      const pfLocations = [
+        path.join(process.env.ProgramW6432 || "C:\\Program Files", "Tesseract-OCR"),
+        path.join(process.env.ProgramFiles || "C:\\Program Files", "Tesseract-OCR"),
+        path.join(process.env["ProgramFiles(x86)"] || "C:\\Program Files (x86)", "Tesseract-OCR"),
+        path.join(process.env.LOCALAPPDATA || "C:\\Users\\Default\\AppData\\Local", "Tesseract-OCR")
+      ];
+
+      let foundPath = null;
+      for (const loc of pfLocations) {
+        if (loc && fs.existsSync(path.join(loc, "tesseract.exe"))) {
+          foundPath = loc;
+          break;
+        }
+      }
+
+      if (foundPath) {
+        console.log(`Found global installation at: ${foundPath}`);
+        console.log(`Copying binaries to local project folder: ${destDir}`);
+        fs.cpSync(foundPath, destDir, { recursive: true });
+        
+        // Clean up the global install so the runner stays pristine
+        const uninstaller = path.join(foundPath, "tesseract-uninstall.exe");
+        if (fs.existsSync(uninstaller)) {
+          console.log(`Cleaning up background global installation...`);
+          try { execSync(`"${uninstaller}" /S`, { stdio: 'ignore' }); } catch (e) {}
+        }
+      } else {
+        throw new Error("Tesseract installation failed. Could not locate tesseract.exe anywhere.");
+      }
+    }
+
+    // Remove the NSIS uninstaller from our app bin so it doesn't get bundled into the final Electron app
+    try {
+      const localUninstaller = path.join(destDir, 'Uninstall.exe');
+      if (fs.existsSync(localUninstaller)) fs.unlinkSync(localUninstaller);
+    } catch (_) {}
+
+    console.log("Windows silent installation complete.");
+    return;
+  }
+
+  // Case 2: Linux Static Raw Executable 
+  if (filePath.endsWith(".x86_64") || filePath.endsWith("tesseract")) {
+    console.log(`Placing raw static binary file for Linux...`);
+    const targetBin = path.join(destDir, "tesseract");
+    fs.copyFileSync(filePath, targetBin);
+    console.log("Binary placement complete.");
+    return;
+  }
+
+  // Case 3: Standard Compressed Archives Fallback
+  console.log(`Extracting archive to ${destDir}...`);
+  const isZip = filePath.endsWith(".zip");
+
+  if (process.platform === "win32") {
+    if (isZip) {
+      execSync(`powershell -Command "Expand-Archive -Path '${filePath}' -DestinationPath '${destDir}' -Force"`);
+    } else {
+      execSync(`tar -xzf "${filePath}" -C "${destDir}"`);
+    }
+  } else {
+    if (isZip) {
+      execSync(`unzip -o "${filePath}" -d "${destDir}"`);
+    } else {
+      execSync(`tar -xzf "${filePath}" -C "${destDir}"`);
+    }
+  }
+  console.log("Extraction complete.");
+}
+async function main() {
+  console.log(`=== Tesseract Binary Installer ===`);
+  console.log(`Target Platform: ${targetPlatform} (${osDirName})`);
+  console.log(`Destination Directory: ${DEST_DIR}`);
+
+  // Check if tesseract binary already exists locally
+  const exeName = targetPlatform === "win32" ? "tesseract.exe" : "tesseract";
+  const binPath = path.join(DEST_DIR, exeName);
+  if (fs.existsSync(binPath)) {
+    console.log(`Tesseract binary already exists locally at: ${binPath}`);
+    console.log("Skipping download and installation.");
+    process.exit(0);
+  }
+
+  // Check if tesseract binary exists globally on Windows and copy it
+  if (targetPlatform === "win32") {
+    console.log("Checking for global Tesseract installation to copy...");
+    const pfLocations = [
+      path.join(process.env.ProgramW6432 || "C:\\Program Files", "Tesseract-OCR"),
+      path.join(process.env.ProgramFiles || "C:\\Program Files", "Tesseract-OCR"),
+      path.join(process.env["ProgramFiles(x86)"] || "C:\\Program Files (x86)", "Tesseract-OCR"),
+      path.join(process.env.LOCALAPPDATA || "C:\\Users\\Default\\AppData\\Local", "Tesseract-OCR")
+    ];
+
+    let foundPath = null;
+    for (const loc of pfLocations) {
+      if (loc && fs.existsSync(path.join(loc, "tesseract.exe"))) {
+        foundPath = loc;
+        break;
+      }
+    }
+
+    if (foundPath) {
+      console.log(`Found global Tesseract installation at: ${foundPath}`);
+      console.log(`Copying binaries directly to local project folder: ${DEST_DIR}`);
+      if (!fs.existsSync(DEST_DIR)) {
+        fs.mkdirSync(DEST_DIR, { recursive: true });
+      }
+      fs.cpSync(foundPath, DEST_DIR, { recursive: true });
+      
+      // Clean up the installer Uninstall.exe if it got copied
+      try {
+        const localUninstaller = path.join(DEST_DIR, 'tesseract-uninstall.exe');
+        if (fs.existsSync(localUninstaller)) fs.unlinkSync(localUninstaller);
+      } catch (_) {}
+
+      console.log("Local Tesseract setup complete (copied from global installation).");
+      process.exit(0);
+    }
+  }
+
+  // Create temporary workspace directory
+  const tmpDir = path.resolve(__dirname, "..", "tmp");
+  if (!fs.existsSync(tmpDir)) {
+    fs.mkdirSync(tmpDir, { recursive: true });
+  }
+
+  let downloadUrl = "";
+  let archiveName = "";
+
+  if (targetPlatform === "win32") {
+    downloadUrl = TESSERACT_WIN_URL;
+    archiveName = "tesseract-setup.exe";
+  } else if (targetPlatform === "linux") {
+    downloadUrl = TESSERACT_LINUX_URL;
+    archiveName = "tesseract.x86_64";
+  } else {
+    console.log(
+      "For macOS, Tesseract binaries should be prepared via package:mac workflows (Homebrew binaries compiled locally). Skipping download.",
+    );
+    process.exit(0);
+  }
+
+  const archivePath = path.join(tmpDir, archiveName);
+
+  try {
+    if (fs.existsSync(archivePath)) {
+      console.log(`Temporary dependency ${archiveName} already exists, skipping download.`);
+    } else {
+      await downloadFile(downloadUrl, archivePath);
+      console.log("Successfully downloaded.");
+    }
+
+    // Unpack / Install
+    extractArchive(archivePath, DEST_DIR);
+
+    // Clean up temporary workspace downloads
+    try {
+      fs.unlinkSync(archivePath);
+    } catch (_) {}
+
+    // Verify binary exists and set permissions
+    const exeName = targetPlatform === "win32" ? "tesseract.exe" : "tesseract";
+    let binPath = path.join(DEST_DIR, exeName);
+
+    // Handle structural nested variations safely
+    if (fs.existsSync(DEST_DIR)) {
+      const subdirs = fs.readdirSync(DEST_DIR);
+      if (!fs.existsSync(binPath) && subdirs.length === 1) {
+        const subDirPath = path.join(DEST_DIR, subdirs[0]);
+        if (fs.statSync(subDirPath).isDirectory()) {
+          console.log(`Moving files from nested directory ${subdirs[0]} to root...`);
+          const files = fs.readdirSync(subDirPath);
+          files.forEach((file) => {
+            fs.renameSync(path.join(subDirPath, file), path.join(DEST_DIR, file));
+          });
+          fs.rmdirSync(subDirPath);
+        }
+      }
+    }
+
+    if (fs.existsSync(binPath)) {
+      if (targetPlatform !== "win32") {
+        fs.chmodSync(binPath, 0o755);
+      }
+      console.log(`Tesseract binary set up successfully at: ${binPath}`);
+    } else {
+      console.warn(
+        `Warning: Executable not found at ${binPath} after extraction. You may need to verify the archive structure.`
+      );
+    }
+  } catch (err) {
+    console.error("Error installing Tesseract binaries:", err.message);
+    process.exit(1);
+  }
+}
+
+main();
