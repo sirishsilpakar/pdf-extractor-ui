@@ -120,7 +120,7 @@ build:linux:
       
       echo "DEBUG: Target Linux Registry URL is -> ${LINUX_BACKEND_URL}"
       
-      curl --fail --silent --show-error --header "JOB-TOKEN: $CI_JOB_TOKEN" --output /tmp/pdf-textract-backend-linux.tar.gz "$LINUX_BACKEND_URL"
+      curl --fail --silent --show-error --retry 5 --retry-delay 3 --retry-all-errors --header "JOB-TOKEN: $CI_JOB_TOKEN" --output /tmp/pdf-textract-backend-linux.tar.gz "$LINUX_BACKEND_URL"
       mkdir -p bin/linux/backend
       tar xzf /tmp/pdf-textract-backend-linux.tar.gz -C bin/linux/backend/
 
@@ -188,10 +188,12 @@ build:macos:
       BACKEND_VERSION="${CI_COMMIT_TAG:-$DEFAULT_BACKEND_VERSION}"
       MAC_BACKEND_URL="${CI_API_V4_URL}/projects/${BACKEND_PROJECT_ID}/packages/generic/pdf-textract-backend/${BACKEND_VERSION}/pdf-textract-backend-mac-${BACKEND_VERSION}.tar.gz"
       HTTP_CODE=$(curl --silent --output /dev/null --write-out "%{http_code}" \
+                       --retry 5 --retry-delay 3 --retry-all-errors \
                        --header "JOB-TOKEN: $CI_JOB_TOKEN" "$MAC_BACKEND_URL")
       if [ "$HTTP_CODE" = "200" ]; then
         echo "Found pre-built macOS backend v${BACKEND_VERSION} - downloading..."
         curl --fail --silent --show-error \
+             --retry 5 --retry-delay 3 --retry-all-errors \
              --header "JOB-TOKEN: $CI_JOB_TOKEN" \
              --output /tmp/pdf-textract-backend-mac.tar.gz \
              "$MAC_BACKEND_URL"
@@ -273,6 +275,7 @@ release:
         FILENAME=$(basename "$f")
         echo "  Uploading $FILENAME..."
         curl --fail --silent --show-error \
+             --retry 5 --retry-delay 3 --retry-all-errors \
              --header "JOB-TOKEN: $CI_JOB_TOKEN" \
              --upload-file "$f" \
              "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/pdf-textract/${CI_COMMIT_TAG}/${FILENAME}"
