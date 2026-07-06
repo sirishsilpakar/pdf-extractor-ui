@@ -16,6 +16,12 @@ if (!fs.existsSync(TESS_EXE)) {
 
 console.log("Fixing Tesseract binaries in:", TESS_DIR);
 
+const getLibBaseName = (filename) => {
+  // Matches e.g. "libsharpyuv" from "libsharpyuv.0.dylib" or "libsharpyuv.0.1.2.dylib"
+  const m = filename.match(/^(lib[a-zA-Z0-9_\-]+)/);
+  return m ? m[1] : filename;
+};
+
 const files = fs.readdirSync(TESS_DIR).filter((f) => f === "tesseract" || f.endsWith(".dylib"));
 
 files.forEach((file) => {
@@ -39,21 +45,33 @@ files.forEach((file) => {
     const match = line.match(/^\t([^\s]+)/);
     if (match) {
       const depPath = match[1];
-      // If the dependency is a Homebrew path or an absolute path to one of our libs
-      if (
-        depPath.includes("/opt/homebrew/") ||
-        depPath.includes("/usr/local/") ||
-        files.some((f) => depPath.endsWith(f))
-      ) {
-        const depName = path.basename(depPath);
-        if (files.includes(depName)) {
-          console.log(`  Updating dependency: ${depName}`);
+      const depName = path.basename(depPath);
+      const depBase = getLibBaseName(depName);
+
+      // Find if we have a matching local file (comparing base names)
+      const matchingFile = files.find((f) => getLibBaseName(f) === depBase);
+
+      if (matchingFile) {
+        // If it is a Homebrew/absolute path, OR it is already relative/rpath but needs redirecting
+        if (
+          depPath.includes("/opt/homebrew/") ||
+          depPath.includes("/usr/local/") ||
+          depPath.startsWith("@rpath/") ||
+          depPath.startsWith("@loader_path/") ||
+          files.some((f) => depPath.endsWith(f))
+        ) {
+          // If the reference path is already exactly what we want, skip it
+          if (depPath === `@loader_path/${matchingFile}`) {
+            return;
+          }
+
+          console.log(`  Updating dependency: ${depName} -> ${matchingFile}`);
           try {
             execSync(
-              `install_name_tool -change "${depPath}" "@loader_path/${depName}" "${filePath}"`,
+              `install_name_tool -change "${depPath}" "@loader_path/${matchingFile}" "${filePath}"`,
             );
           } catch (e) {
-            console.error(`    Failed to update ${depName} in ${file}`);
+            console.error(`    Failed to update dependency in ${file}: ${e.message}`);
           }
         }
       }
