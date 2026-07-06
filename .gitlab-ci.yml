@@ -219,10 +219,21 @@ build:macos:
       for lib in $(otool -L "$TESS_PREFIX/bin/tesseract" | awk '/\/opt\/homebrew|\/usr\/local/{print $1}'); do
         [ -f "$lib" ] && cp "$lib" "$DEST/" && echo "  Copied: $(basename $lib)"
       done
-      for dylib in "$DEST"/*.dylib; do
-        for dep in $(otool -L "$dylib" | awk '/\/opt\/homebrew|\/usr\/local/{print $1}'); do
-          [ -f "$dep" ] && [ ! -f "$DEST/$(basename $dep)" ] && cp "$dep" "$DEST/" && echo "  Copied dep: $(basename $dep)"
+      echo "Copying recursive dependencies..."
+      while true; do
+        copied_any=false
+        for dylib in "$DEST"/*.dylib; do
+          for dep in $(otool -L "$dylib" | awk '/\/opt\/homebrew|\/usr\/local/{print $1}'); do
+            if [ -f "$dep" ] && [ ! -f "$DEST/$(basename $dep)" ]; then
+              cp "$dep" "$DEST/"
+              echo "  Copied dep: $(basename $dep)"
+              copied_any=true
+            fi
+          done
         done
+        if [ "$copied_any" = false ]; then
+          break
+        fi
       done
       chmod +x "$DEST/tesseract"
     - echo "Patching dylib load paths to be self-contained..."
