@@ -1,8 +1,7 @@
-import { Play, Square, Zap } from "lucide-react";
+import { Play, Sliders, Square, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { motion } from "framer-motion";
-import type { PDFFile } from "@/types";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,8 +23,11 @@ interface Props {
   pendingFilesCount: number;
   isProcessing: boolean;
   eventErr: boolean;
+  elapsedSeconds?: number;
+  etaSeconds?: number | null;
   onCancel: () => void;
   onStart: () => void;
+  onToggleSettings?: () => void;
 }
 
 export function ProcessingDashboard({
@@ -36,8 +38,11 @@ export function ProcessingDashboard({
   pendingFilesCount = 0,
   isProcessing,
   eventErr,
+  elapsedSeconds,
+  etaSeconds,
   onCancel,
   onStart,
+  onToggleSettings,
 }: Props) {
   const remaining = totalFiles - completedFiles;
   const [t, setT] = useState(0);
@@ -56,10 +61,18 @@ export function ProcessingDashboard({
   }, [isProcessing]);
 
   useEffect(() => {
+    if (elapsedSeconds !== undefined && elapsedSeconds > t) {
+      setT(elapsedSeconds);
+    }
+  }, [elapsedSeconds]);
+
+  useEffect(() => {
     if (pendingFilesCount > 0) {
       setT(0);
     }
   }, [pendingFilesCount]);
+
+  useEffect(() => { if (remaining === 0) setT(0); }, [remaining]);
 
   useEffect(() => {
     if (eventErr) {
@@ -68,28 +81,51 @@ export function ProcessingDashboard({
     }
   }, [eventErr]);
 
-  const eta = remaining > 0 ? `~${Math.floor(remaining * Math.PI)}s` : "0s";
+  let etaStr = "0s";
+  if (remaining > 0) {
+    if (etaSeconds !== undefined && etaSeconds !== null) {
+      etaStr = `~${etaSeconds}s`;
+    } else if (isProcessing && overallProgress > 0 && t > 0) {
+      const rate = overallProgress / t;
+      const remainingProgress = 100 - overallProgress;
+      const estEta = Math.round(remainingProgress / rate);
+      etaStr = `~${estEta}s`;
+    } else {
+      etaStr = "Calculating...";
+    }
+  }
 
   return (
     <div className="glass rounded-2xl p-5 space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Zap className="h-4 w-4 text-accent" aria-hidden="true" />
+          <Zap className="h-4 w-4 text-primary" aria-hidden="true" />
           <h2 className="font-semibold text-sm">
             Processing Dashboard
           </h2>
         </div>
         <div className="flex items-center gap-1.5">
           {!isProcessing && (
-            <Button
-              size="sm"
-              className="rounded-xl gap-1 text-xs"
-              onClick={onStart}
-              disabled={pendingFilesCount === 0}
-              aria-label="Start Processing"
-            >
-              <Play className="h-3 w-3" aria-hidden="true" /> Start
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-xl gap-1 text-xs lg:hidden"
+                onClick={onToggleSettings}
+                aria-label="Configure Settings"
+              >
+                <Sliders className="h-3.5 w-3.5" aria-hidden="true" /> Configure
+              </Button>
+              <Button
+                size="sm"
+                className="rounded-xl gap-1 text-xs"
+                onClick={onStart}
+                disabled={pendingFilesCount === 0}
+                aria-label="Start Processing"
+              >
+                <Play className="h-3 w-3" aria-hidden="true" /> Start
+              </Button>
+            </>
           )}
           {isProcessing && (
             <AlertDialog>
@@ -112,10 +148,10 @@ export function ProcessingDashboard({
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel className="rounded-xl">
+                  <AlertDialogCancel className="rounded-xl bg-inherit hover:bg-primary hover:text-white">
                     Keep Going
                   </AlertDialogCancel>
-                  <AlertDialogAction className="rounded-xl" onClick={onCancel}>
+                  <AlertDialogAction className="rounded-xl bg-red-600 hover:bg-red-700" onClick={onCancel}>
                     Cancel Processing
                   </AlertDialogAction>
                 </AlertDialogFooter>
@@ -154,7 +190,7 @@ export function ProcessingDashboard({
             label: "Elapsed",
             value: `${String((t / 60) | 0).padStart(2, "0")}:${String((t % 60) | 0).padStart(2, "0")}`,
           },
-          { label: "ETA", value: eta },
+          { label: "ETA", value: etaStr },
           { label: "Processed", value: `${completedFiles}/${totalFiles}` },
           { label: "Remaining", value: String(remaining) },
         ].map((s) => (

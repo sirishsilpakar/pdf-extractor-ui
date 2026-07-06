@@ -2,6 +2,10 @@ export type FileStatus = 'queued' | 'processing' | 'completed' | 'failed' | 'idl
 
 export type ExtractMethod = 'direct' | 'ocr' | 'error' | 'undefined';
 
+export type StateUpdater<T> = T | ((prev: T) => T);
+
+export type Setter<T> = (value: StateUpdater<T>) => void;
+
 export interface PDFFile {
   id: string;
   name: string;
@@ -19,6 +23,9 @@ export interface PDFFile {
   runId?: string;
   totalPages?: number;
   currentPage?: number;
+  message?: string;
+  flags?: string;
+  error_message?: string;
 }
 
 export interface Run {
@@ -33,6 +40,8 @@ export interface Run {
   elapsedSeconds: number;
   etaSeconds: number | null;
   progressPct: number;
+  outputDir?: string;
+  runNumber?: number;
 }
 
 export interface PaginationState {
@@ -48,6 +57,7 @@ export interface ProcessingSettings {
   removePageNumbers: boolean;
   removeNumericValues: boolean;
   enableLemmatization: boolean;
+  applyTextFormatting: boolean;
 }
 
 export interface LogEntry {
@@ -68,11 +78,17 @@ export interface ExtractionResult {
   page_count: number | null;
   processed_at: string | null;
   run_id: string | null;
+  run_number?: number | null;
+  txt_path?: string;
+  has_duplicate?: boolean;
+  error_message?: string | null;
+  flags?: string | null;
 }
 
 /** Full record returned by GET /api/v1/results/{id} — includes extracted text */
 export interface ExtractionResultDetail extends ExtractionResult {
   content: string;
+  txt_path: string;
 }
 
 /** Search result returned by GET /api/v1/search — snippet already has <mark> tags */
@@ -90,6 +106,16 @@ export interface AbortController {
   abort: () => void;
 }
 
+export type RegisteredPath = {
+  batchId: string;
+  path: string;
+  pdfCount: number;
+  alreadyProcessedCount: number;
+  isFolder: boolean;
+  status: string;
+  filesScanned?: number;
+};
+
 export interface PendingFile {
   id: string;
   hash: string | null;
@@ -97,17 +123,30 @@ export interface PendingFile {
   absPath?: string;
   name?: string;
   size?: number;
-  isReference?: boolean;
-  isAlreadyRegistered?: boolean;
+  isPathReference?: boolean;
+  isAlreadyProcessed?: boolean;
   relPath?: string;
-  refId?: string;
+  batchId?: string;
+  method?: string;
 }
+
+export type ReprocessModalData = {
+  fileHashes? : string[],
+  processedFileHashes?: string[],
+  totalFilesCount: number;
+  processedFilesCount: number;
+}
+
 export interface FilesListItem {
+  batch_id?: string;
   content_hash: string;
   is_processed: boolean;
   name: string;
   rel_path: string;
   size_bytes: number;
+  method?: string;
+  flags?: string | null;
+  error_message?: string | null;
 }
 
 export interface SSEStateUpdateEvent {
@@ -116,6 +155,8 @@ export interface SSEStateUpdateEvent {
   done: number;
   total: number;
   progress_pct: number;
+  elapsed?: number;
+  eta_seconds?: number | null;
   run_id?: string;
   current_file?: string;
 }
@@ -129,9 +170,37 @@ export interface SSELogEvent {
 export interface SSEFileProgressEvent {
   type: 'file_progress';
   file: string;
+  method?: ExtractMethod;
   pct: number;
   page?: number;
   total_pages?: number;
+  status?: FileStatus;
 }
 
 export type SSEEvent = SSEStateUpdateEvent | SSELogEvent | SSEFileProgressEvent;
+
+export interface ResultTreeDirectory {
+  run_id: string;
+  run_number?: number | null;
+  path: string;
+  count: number;
+  has_duplicate?: boolean;
+}
+
+export interface ResultTreeResponse {
+  directories: ResultTreeDirectory[];
+  directories_total: number;
+  top_level_files: ExtractionResult[];
+  top_level_files_total: number;
+  page: number;
+  size: number;
+  pages: number;
+  total: number;
+}
+
+export type SortField = "name" | "status" | "progress" | "method" | "size";
+
+export interface SortItem {
+  key: SortField;
+  direction: "asc" | "desc";
+}

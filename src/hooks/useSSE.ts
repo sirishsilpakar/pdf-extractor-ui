@@ -3,6 +3,19 @@ import { useAppStore } from "@/store/useAppStore";
 import { SSE_URL } from "@/lib/api";
 import { useQueryClient } from "@tanstack/react-query";
 import type { SSEEvent, SSEStateUpdateEvent, PDFFile, SSEFileProgressEvent } from "@/types";
+import { toast } from "@/components/ui/sonner";
+
+function resetDashboard(state) { 
+  state.setPendingFiles([]);
+  state.setTotalFiles(0);
+  state.setCompletedFiles(0);
+  state.setOverallProgress(0);
+  state.setIsProcessing(false);
+  state.setProcessingFile("");
+  state.setElapsedSeconds(0);
+  state.setEtaSeconds(null);
+  state.setSkipProcessedFiles(false);
+}
 
 export function useSSE() {
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -14,7 +27,7 @@ export function useSSE() {
     
     state.setIsProcessing(running);
     
-    if (running || (data.total && data.total > 0)) {
+    if (running) {
       const total = data.total || 0;
       const done = data.done || 0;
       const calculatedProgress = total > 0 ? Math.floor((done / total) * 100) : 0;
@@ -35,14 +48,42 @@ export function useSSE() {
       state.setCompletedFiles(done);
       state.setCurrentRunId(data.run_id || null);
       if (data.current_file) state.setProcessingFile(data.current_file);
+      if (data.elapsed !== undefined) state.setElapsedSeconds(data.elapsed);
+      if (data.eta_seconds !== undefined) state.setEtaSeconds(data.eta_seconds);
+    }
+
+    if (data.status === "cancelled" && !!data?.current_file) {
+      toast.warning("Extraction is cancelled", {  
+        duration: 5000
+      }); 
+      resetDashboard(state);
     }
 
     if (running) {
-      queryClient.invalidateQueries({ queryKey: ["job-files"] });
+      // Avoid query invalidations during active processing to prevent network storm requests
+      // Progress is pushed and updated via file_progress events
     } else {
       // Job just finished or is idle
       queryClient.invalidateQueries({ queryKey: ["runs"] });
       queryClient.invalidateQueries({ queryKey: ["results"] });
+      queryClient.invalidateQueries({ queryKey: ["job-files"] });
+
+      if (data.status === "done" && data.total !== 0) {
+        toast.success("Extraction is completed", { 
+          action : { 
+            label: "View results", 
+            onClick: () => {
+              state.setCurrentView("results");
+              state.setResultsRunFilter(data.run_id);
+            } 
+          }, 
+          duration: Infinity
+        }); 
+        resetDashboard(state);
+      } else if (data.status === "failed") {
+        toast.error("Extraction failed");
+        resetDashboard(state);
+      }
     }
   }, [queryClient]);
 
@@ -80,7 +121,8 @@ export function useSSE() {
                   return { 
                     ...item, 
                     progress: progressData.pct,
-                    status: "processing",
+                    method: progressData.method || item.method,
+                    status: progressData.status || (progressData.pct === 100 ? "completed" : "processing"),
                     currentPage: progressData.page,
                     totalPages: progressData.total_pages
                   } as PDFFile;
@@ -103,7 +145,6 @@ export function useSSE() {
           }
 
           if (progressData.pct === 100) {
-            queryClient.invalidateQueries({ queryKey: ["job-files"] });
             queryClient.invalidateQueries({ queryKey: ["results"] });
           }
           break;

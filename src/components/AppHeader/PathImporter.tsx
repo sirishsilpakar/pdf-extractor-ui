@@ -1,25 +1,35 @@
-import { useRef, useState } from "react";
 import { FileUp, FolderUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { openFile, openFolder } from "@/lib/electron";
+import { useState } from "react";
 
 interface PathImporterProps {
   onAddPath: (path: string) => void;
 }
 
 export function PathImporter({ onAddPath }: PathImporterProps) {
+  const [isOpen, setIsOpen] = useState(false);
 
   const onImportFiles = async (mode: "single" | "multiple") => {
-    if (mode === "single") {
-      const path = await window.electronAPI.openFile();
-      if (path ) {
-        onAddPath(path);
+    if (isOpen) return;
+  
+    setIsOpen(true);
+    try {
+      if (mode === "single") {
+        const path = await openFile();
+        if (path) {
+          onAddPath(path);
+        }
+      } else if (mode === "multiple") {
+        const path = await openFolder();
+        if (path) {
+          onAddPath(path);
+        }
       }
-    } else if (mode === "multiple") {
-      const path = await window.electronAPI.openFolder();
-      if (path ) {
-        onAddPath(path);
-      }
+    } catch (error) {
+      console.error("Failed to open the file explorer:", error)
+    } finally {
+      setIsOpen(false);
     }
   };
 
@@ -28,8 +38,9 @@ export function PathImporter({ onAddPath }: PathImporterProps) {
       <Button
         variant="outline"
         size="sm"
-        className="rounded-xl gap-1.5 text-xs"
+        className="bg-inherit rounded-xl gap-1.5 text-xs hover:bg-primary hover:text-white"
         onClick={() => onImportFiles("single")}
+        disabled={isOpen}
         aria-label="Import File Button"
       >
         <FileUp className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Import File</span>
@@ -37,8 +48,9 @@ export function PathImporter({ onAddPath }: PathImporterProps) {
       <Button
         variant="outline"
         size="sm"
-        className="rounded-xl gap-1.5 text-xs"
+        className="bg-inherit rounded-xl gap-1.5 text-xs hover:bg-primary hover:text-white"
         onClick={() => onImportFiles("multiple")}
+        disabled={isOpen}
         aria-label="Import Folder Button"
       >
         <FolderUp className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Import Folder</span>

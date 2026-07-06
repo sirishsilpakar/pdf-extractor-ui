@@ -16,7 +16,7 @@ export const FileTableEmpty = React.memo(({ handleDrop }: FileTableEmptyProps) =
         <Upload className="h-8 w-8 text-muted-foreground" />
       </div>
       <div className="text-center">
-        <p className="font-medium">No files uploaded yet</p>
+        <p className="font-medium">No files selected yet</p>
         <p className="text-sm text-muted-foreground mt-1">
           Drag & drop PDF files here, or use the import buttons above
         </p>

@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { FileDown, Terminal } from "lucide-react";
 import type { LogEntry } from "@/types";
 import { cn } from "@/lib/utils";
+import { useAppStore } from "@/store/useAppStore";
+import { API_BASE } from "@/lib/api";
 
 const typeColors: Record<LogEntry["type"], string> = {
   info: "text-muted-foreground",
@@ -27,6 +29,7 @@ interface Props {
 
 export function LogsPanel({ logs, autoscroll, onToggleAutoscroll }: Props) {
   const parentRef = useRef<HTMLDivElement>(null);
+  const currentRunId = useAppStore((state) => state.currentRunId);
   
   const rowVirtualizer = useVirtualizer({
     count: logs.length,
@@ -56,7 +59,7 @@ export function LogsPanel({ logs, autoscroll, onToggleAutoscroll }: Props) {
     >
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/50">
         <div className="flex items-center gap-2">
-          <Terminal className="h-4 w-4 text-accent" aria-hidden="true" />
+          <Terminal className="h-4 w-4 text-primary" aria-hidden="true" />
           <h3 className="font-semibold text-sm">Activity Log</h3>
           <span className="text-xs text-muted-foreground" aria-live="polite" aria-atomic="true">
             ({logs.length} entries)
@@ -67,23 +70,47 @@ export function LogsPanel({ logs, autoscroll, onToggleAutoscroll }: Props) {
              <Button
                 variant="ghost"
                 size="sm"
-                className="rounded-xl gap-1 text-[10px] h-6 px-2 bg-accent/20 text-accent animate-pulse"
+                className="rounded-xl gap-1 text-[10px] h-6 px-2 text-white bg-primary animate-pulse hover:bg-primary hover:text-white"
                 onClick={onToggleAutoscroll}
                 aria-label="Resume auto-scroll"
               >
                 Resume Auto-scroll
               </Button>
-          )}
+           )}
 
           <Button
             variant="ghost"
             size="sm"
-            className="rounded-xl gap-1 text-xs h-7"
-            onClick={() => {
-              const text = logs.map(l => `[${l.timestamp.toLocaleTimeString()}] [${typePrefix[l.type]}] ${l.message}`).join("\n");
-              const blob = new Blob([text], { type: 'text/plain' });
+            className="rounded-xl gap-1 text-xs h-7 hover:bg-primary hover:text-white"
+            onClick={async () => {
+              if (currentRunId) {
+                try {
+                  const res = await fetch(`${API_BASE}/runs/${currentRunId}/log`);
+                  if (res.ok) {
+                    const text = await res.text();
+                    const blob = new Blob([text], { type: "text/plain" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `run-${currentRunId}-log.txt`;
+                    a.click();
+                    return;
+                  }
+                } catch (e) {
+                  console.error("Failed to fetch full run log, falling back to local logs", e);
+                }
+              }
+              const text = logs
+                .map(
+                  (l) =>
+                    `[${l.timestamp.toLocaleTimeString()}] [${
+                      typePrefix[l.type]
+                    }] ${l.message}`
+                )
+                .join("\n");
+              const blob = new Blob([text], { type: "text/plain" });
               const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
+              const a = document.createElement("a");
               a.href = url;
               a.download = `logs-${new Date().getTime()}.txt`;
               a.click();
@@ -96,7 +123,7 @@ export function LogsPanel({ logs, autoscroll, onToggleAutoscroll }: Props) {
       </div>
       <div 
         ref={parentRef}
-        className="flex-1 px-4 py-2 overflow-y-auto no-scrollbar"
+        className="flex-1 px-4 py-2 overflow-y-auto custom-scrollbar"
         onScroll={handleScroll}
         aria-live="polite"
         role="log"
