@@ -223,10 +223,26 @@ build:macos:
       while true; do
         copied_any=false
         for dylib in "$DEST"/*.dylib; do
-          for dep in $(otool -L "$dylib" | awk '/\/opt\/homebrew|\/usr\/local/{print $1}'); do
-            if [ -f "$dep" ] && [ ! -f "$DEST/$(basename $dep)" ]; then
-              cp "$dep" "$DEST/"
-              echo "  Copied dep: $(basename $dep)"
+          for dep in $(otool -L "$dylib" | awk '/\/opt\/homebrew|\/usr\/local|@rpath/{print $1}'); do
+            dep_name=$(basename "$dep")
+            [ -f "$DEST/$dep_name" ] && continue
+            
+            dep_file=""
+            if [[ "$dep" =~ ^@rpath/ ]]; then
+              if [ -f "/opt/homebrew/lib/$dep_name" ]; then
+                dep_file="/opt/homebrew/lib/$dep_name"
+              elif [ -f "/usr/local/lib/$dep_name" ]; then
+                dep_file="/usr/local/lib/$dep_name"
+              elif [ -f "$TESS_PREFIX/lib/$dep_name" ]; then
+                dep_file="$TESS_PREFIX/lib/$dep_name"
+              fi
+            elif [ -f "$dep" ]; then
+              dep_file="$dep"
+            fi
+            
+            if [ -n "$dep_file" ]; then
+              cp "$dep_file" "$DEST/"
+              echo "  Copied dep: $dep_name (from $dep_file)"
               copied_any=true
             fi
           done
