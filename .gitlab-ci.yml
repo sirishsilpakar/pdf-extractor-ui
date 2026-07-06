@@ -219,10 +219,37 @@ build:macos:
       for lib in $(otool -L "$TESS_PREFIX/bin/tesseract" | awk '/\/opt\/homebrew|\/usr\/local/{print $1}'); do
         [ -f "$lib" ] && cp "$lib" "$DEST/" && echo "  Copied: $(basename $lib)"
       done
-      for dylib in "$DEST"/*.dylib; do
-        for dep in $(otool -L "$dylib" | awk '/\/opt\/homebrew|\/usr\/local/{print $1}'); do
-          [ -f "$dep" ] && [ ! -f "$DEST/$(basename $dep)" ] && cp "$dep" "$DEST/" && echo "  Copied dep: $(basename $dep)"
+      echo "Copying recursive dependencies..."
+      while true; do
+        copied_any=false
+        for dylib in "$DEST"/*.dylib; do
+          for dep in $(otool -L "$dylib" | awk '/\/opt\/homebrew|\/usr\/local|@rpath/{print $1}'); do
+            dep_name=$(basename "$dep")
+            [ -f "$DEST/$dep_name" ] && continue
+            
+            dep_file=""
+            if [[ "$dep" =~ ^@rpath/ ]]; then
+              if [ -f "/opt/homebrew/lib/$dep_name" ]; then
+                dep_file="/opt/homebrew/lib/$dep_name"
+              elif [ -f "/usr/local/lib/$dep_name" ]; then
+                dep_file="/usr/local/lib/$dep_name"
+              elif [ -f "$TESS_PREFIX/lib/$dep_name" ]; then
+                dep_file="$TESS_PREFIX/lib/$dep_name"
+              fi
+            elif [ -f "$dep" ]; then
+              dep_file="$dep"
+            fi
+            
+            if [ -n "$dep_file" ]; then
+              cp "$dep_file" "$DEST/"
+              echo "  Copied dep: $dep_name (from $dep_file)"
+              copied_any=true
+            fi
+          done
         done
+        if [ "$copied_any" = false ]; then
+          break
+        fi
       done
       chmod +x "$DEST/tesseract"
     - echo "Patching dylib load paths to be self-contained..."
