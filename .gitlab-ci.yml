@@ -303,7 +303,7 @@ build:macos:
 # ===========================================================================
 # 4. Release Stage - Create GitLab Release on Git Tag
 # ===========================================================================
-release:
+upload:
   stage: release
   image: registry.gitlab.com/gitlab-org/release-cli:latest
   tags:
@@ -335,10 +335,23 @@ release:
              --upload-file "$f" \
              "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/pdf-textract/${EFFECTIVE_VERSION}/${FILENAME}"
       done
-    - echo "==> Creating GitLab Release for $EFFECTIVE_VERSION..."
   artifacts:
     reports:
       dotenv: release.env
+
+release:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  tags:
+    - docker
+  needs:
+    - job: upload
+      artifacts: true
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
+    - if: $CI_PIPELINE_SOURCE == "web" && $RELEASE_VERSION != ""
+  script:
+    - echo "Creating release for $RELEASE_TAG"
   release:
     name: "PDF Textract $RELEASE_TAG"
     description: |
@@ -347,12 +360,12 @@ release:
       ## Downloads
       | Platform | Format | Description |
       |---|---|---|
-      | Windows | `.exe` | NSIS Setup Installer |
-      | Windows | `.zip` | Portable version |
-      | Linux   | `.AppImage` | Universal portable format |
-      | Linux   | `.deb` | Debian/Ubuntu package |
-      | macOS   | `.dmg` | macOS disk image |
-      | macOS   | `.zip` | Portable version |
+      | Windows | .exe | NSIS Setup Installer |
+      | Windows | .zip | Portable version |
+      | Linux   | .AppImage | Universal portable format |
+      | Linux   | .deb | Debian/Ubuntu package |
+      | macOS   | .dmg | macOS disk image |
+      | macOS   | .zip | Portable version |
     tag_name: "$RELEASE_TAG"
     ref: "$CI_COMMIT_SHA"
     assets:
