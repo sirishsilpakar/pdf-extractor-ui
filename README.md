@@ -236,6 +236,23 @@ npm run electron:build:linux
 
 ---
 
+## CI/CD & Release Pipeline
+
+This project uses a GitLab CI/CD pipeline configured for multi-platform desktop application packaging and creation of releases.
+
+### Triggers
+- **No Branch Pushes:** Pushes or merges to the `main` branch do **not** trigger builds or releases.
+- **Git Tags:** Pushes of version tags (e.g., `v3.2.3`) trigger the entire pipeline (builds for Windows, Linux, and macOS, followed by the automated GitLab Release).
+- **Manual Runs:** Pipelines can be triggered manually via the GitLab Web UI (**CI/CD -> Pipelines -> Run pipeline**).
+
+### Manual Run Inputs
+When triggering a manual pipeline, you can customize the build using input variables in the UI:
+1. `RELEASE_VERSION`: Enter the release version tag (e.g., `v3.2.3`). If specified, this will register the version in the packaged files and create a GitLab Release. If left empty, it only builds test binaries without a release.
+2. `BACKEND_VERSION`: Enter the specific version tag of the pre-built backend binaries to download from the Package Registry (e.g., `v1.2.0`). If left empty, it defaults to the frontend's tag or manual version.
+   *Note: If no version can be resolved, the pipeline will fail immediately.*
+
+---
+
 ## Contributing
 
 Contributions are welcome.
